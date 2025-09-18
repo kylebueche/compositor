@@ -48,7 +48,7 @@ ImageF::buffer(const char *filename)
     int nrChannels;
 
     // Desired channels is 4, will always convert to an rgba image.
-    unsigned char *data = stbi_load(filename, &width, &height, &nrChannels, DESIRED_CHANNELS);
+    unsigned char *data = stbi_load(filename, &width, &height, &nrChannels, NUM_CHANNELS);
     int dataIndex;
 
     // Handle stbi loading errors
@@ -140,7 +140,7 @@ void ImageI::write(const char *filename)
         intBuffer[i].col.b = std::min(uint8_t(255.99f * img.pixels[i].col.b), uint8_t(255));
         intBuffer[i].col.a = std::min(uint8_t(255.99f * img.pixels[i].col.a), uint8_t(255));
     }
-    stbi_write_png(filename, this->width, this->height, DESIRED_CHANNELS, intBuffer, this->width * sizeof(uint8_t) * 4);
+    stbi_write_png(filename, this->width, this->height, NUM_CHANNELS, intBuffer, this->width * sizeof(uint8_t) * NUM_CHANNELS);
     delete(intBuffer);
 }
 

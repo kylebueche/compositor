@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <iostream>
 
-const int DESIRED_CHANNELS = 4;
+const int NUM_CHANNELS = 4;
 
 typedef union
 {
