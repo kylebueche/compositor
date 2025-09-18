@@ -5,3 +5,12 @@ Main.exe
 *.o
 *.d
 
+*.jpg
+*.png
+*.hdr
+*.ppm
+*.jpeg
+*.gif
+*.webp
+*.mp4
+*.raw

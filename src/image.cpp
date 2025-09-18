@@ -17,31 +17,68 @@
  * for loading a large sequence of images.
  *
  ***********************************************/
-ImageI::ImageI(const char *fileName)
+
+// From file constructor
+ImageF::ImageF(const char *filename)
 {
-    pixels = NULL;
+    this->pixels = NULL;
+    this->buffer(filename);
+}
+
+// Copy constructor
+ImageF::ImageF(const ImageF& img)
+{
+    this->buffer(img);
+}
+
+ImageF::~ImageF()
+{
+    if (pixels != NULL)
+    {
+        delete(pixels);
+    }
+}
+
+// From file bufferer
+ImageF::buffer(const char *filename)
+{
     int width;
     int height;
     int pixelCount;
     int nrChannels;
 
     // Desired channels is 4, will always convert to an rgba image.
-    unsigned char *data = stbi_load(fileName, &width, &height, &nrChannels, DESIRED_CHANNELS);
+    unsigned char *data = stbi_load(filename, &width, &height, &nrChannels, DESIRED_CHANNELS);
     int dataIndex;
 
+    // Handle stbi loading errors
     if (data)
     {
         pixelCount = width * height;
-        this->pixels = new pixel4i_t[pixelCount];
+        if (pixels == NULL)
+        {
+            pixels = new pixel4f_t[pixelCount];
+        }
+        else
+        {
+            // Don't reallocate if the new image is the same size as this buffer
+            if (pixelCount != this->pixelCount)
+            {
+                delete(pixels);
+                pixels = new pixel4f_t[pixelCount];
+            }
+        }
+        // Handle dynamic allocation failure
         if (pixels != NULL)
         {
+            float scalar = 1.0f / 255.0f;
             for (int i = 0; i < pixelCount; i++)
             {
                 dataIndex = i * 4;
-                this->pixels[i].col.r = uint8_t(data[dataIndex]);
-                this->pixels[i].col.g = uint8_t(data[dataIndex + 1]);
-                this->pixels[i].col.b = uint8_t(data[dataIndex + 2]);
-                this->pixels[i].col.a = uint8_t(data[dataIndex + 3]);
+                pixels[i].col.r = scalar * float(data[dataIndex]);
+                pixels[i].col.g = scalar * float(data[dataIndex + 1]);
+                pixels[i].col.b = scalar * float(data[dataIndex + 2]);
+                pixels[i].col.a = scalar * float(data[dataIndex + 3]);
             }
             this->width = width;
             this->height = height;
@@ -60,88 +97,51 @@ ImageI::ImageI(const char *fileName)
     }
 }
 
-ImageI::~ImageI()
+// Copy bufferer
+ImageF::buffer(const ImageF& img)
 {
+    if (pixels == NULL)
+    {
+        this->pixels = new pixel4f_t[img.pixelCount];
+    }
+    else
+    {
+        // Don't reallocate if the new image is the same size as this buffer
+        if (img.pixelCount != this->pixelCount)
+        {
+            delete(pixels);
+            this->pixels = new pixel4f_t[img.pixelCount];
+        }
+    }
     if (pixels != NULL)
     {
-        delete(pixels);
+        this->width = img.width;
+        this->height = img.height;
+        this->pixelCount = img.pixelCount;
+        this->aspectRatio = img.aspectRatio;
+        for (int i = 0; i < pixelCount; i++)
+        {
+            this->pixels[i] = img.pixels[i];
+        }
     }
-}
-
-// Copy int to int
-ImageI::ImageI(const ImageI& img)
-{
-    this->pixels = new pixel4i_t[img.width * img.height];
-    this->width = img.width;
-    this->height = img.height;
-    this->pixelCount = img.pixelCount;
-    this->aspectRatio = img.aspectRatio;
-    for (int i = 0; i < img.width * img.height; i++)
+    else
     {
-        this->pixels[i] = img.pixels[i];
-    }
-}
-
-// Copy float to int
-ImageI::ImageI(const ImageF& img)
-{
-    this->pixels = new pixel4i_t[img.width * img.height];
-    this->width = img.width;
-    this->height = img.height;
-    this->pixelCount = img.pixelCount;
-    this->aspectRatio = img.aspectRatio;
-    for (int i = 0; i < pixelCount; i++)
-    {
-        this->pixels[i].col.r = std::min(uint8_t(255.99f * img.pixels[i].col.r), uint8_t(255));
-        this->pixels[i].col.g = std::min(uint8_t(255.99f * img.pixels[i].col.g), uint8_t(255));
-        this->pixels[i].col.b = std::min(uint8_t(255.99f * img.pixels[i].col.b), uint8_t(255));
-        this->pixels[i].col.a = std::min(uint8_t(255.99f * img.pixels[i].col.a), uint8_t(255));
-    }
-}
-
-// Copy float to float
-ImageF::ImageF(const ImageF& img)
-{
-    this->pixels = new pixel4f_t[img.width * img.height];
-    this->width = img.width;
-    this->height = img.height;
-    this->pixelCount = img.pixelCount;
-    this->aspectRatio = img.aspectRatio;
-    for (int i = 0; i < pixelCount; i++)
-    {
-        this->pixels[i] = img.pixels[i];
-    }
-}
-
-// Copy int to float
-ImageF::ImageF(const ImageI& img)
-{
-    this->pixels = new pixel4f_t[img.width * img.height];
-    this->width = img.width;
-    this->height = img.height;
-    this->pixelCount = img.pixelCount;
-    this->aspectRatio = img.aspectRatio;
-    float scalar = 1.0f / 255.0f;
-    for (int i = 0; i < pixelCount; i++)
-    {
-        this->pixels[i].col.r = scalar * float(img.pixels[i].col.r);
-        this->pixels[i].col.g = scalar * float(img.pixels[i].col.g);
-        this->pixels[i].col.b = scalar * float(img.pixels[i].col.b);
-        this->pixels[i].col.a = scalar * float(img.pixels[i].col.a);
-    }
-}
-
-ImageF::~ImageF()
-{
-    if (pixels != NULL)
-    {
-        delete(pixels);
+        std::cerr << "ERROR: Couldn't allocate memory for the image";
     }
 }
 
 void ImageI::write(const char *filename)
 {
-    stbi_write_png(filename, this->width, this->height, DESIRED_CHANNELS, this->pixels, this->width * sizeof(uint8_t) * 4);
+    pixel4i_t *intBuffer = new pixel4i_t[pixelCount];
+    for (int i = 0; i < pixelCount; i++)
+    {
+        intBuffer[i].col.r = std::min(uint8_t(255.99f * img.pixels[i].col.r), uint8_t(255));
+        intBuffer[i].col.g = std::min(uint8_t(255.99f * img.pixels[i].col.g), uint8_t(255));
+        intBuffer[i].col.b = std::min(uint8_t(255.99f * img.pixels[i].col.b), uint8_t(255));
+        intBuffer[i].col.a = std::min(uint8_t(255.99f * img.pixels[i].col.a), uint8_t(255));
+    }
+    stbi_write_png(filename, this->width, this->height, DESIRED_CHANNELS, intBuffer, this->width * sizeof(uint8_t) * 4);
+    delete(intBuffer);
 }
 
 void ImageF::toGreyscale(float rScalar, float gScalar, float bScalar)
@@ -160,7 +160,6 @@ void ImageF::toGreyscale(float rScalar, float gScalar, float bScalar)
 
 void ImageF::toNegative()
 {
-    float avg;
     for (int i = 0; i < pixelCount; i++)
     {
         pixels[i].col.r = 1.0 - pixels[i].col.r;
@@ -168,4 +167,3 @@ void ImageF::toNegative()
         pixels[i].col.b = 1.0 - pixels[i].col.b;
     }
 }
-

@@ -50,28 +50,6 @@ typedef union
     float array[4];
 } pixel4f_hsv_t;
 
-class ImageF;
-
-class ImageI
-{
-    public:
-        unsigned int width;
-        unsigned int height;
-        unsigned int pixelCount;
-        float aspectRatio;
-        pixel4i_t *pixels;
-        
-        ImageI(const char*);
-        ImageI(const ImageI&);
-        ImageI(const ImageF&);
-        ~ImageI();
-        void write(const char*);
-        inline unsigned int index(unsigned int x, unsigned int y)
-        {
-            return y * width + x;
-        }
-};
-
 class ImageF
 {
     public:
@@ -81,9 +59,11 @@ class ImageF
         float aspectRatio;
         pixel4f_t *pixels;
 
+        ImageF(const char*);
         ImageF(const ImageF&);
-        ImageF(const ImageI&);
         ~ImageF();
+        buffer(const char*);
+        buffer(const ImageF&);
         void toGreyscale(float, float, float);
         void toNegative();
         inline unsigned int index(unsigned int x, unsigned int y)
