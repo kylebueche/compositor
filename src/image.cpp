@@ -4,103 +4,168 @@
  *
  *******************************************/
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image.h"
+#include "stb_image_write.h"
 #include "image.h"
 
-ImageI::ImageI(uint32_t width, uint32_t height)
-{
-    width = width;
-    height = height;
-    aspectRatio = float(width) / float(height);
-    pixels = std::vector<PixelI>(width * height);
-}
-
-ImageF::ImageF(uint32_t width, uint32_t height)
-{
-    width = width;
-    height = height;
-    aspectRatio = float(width) / float(height);
-    pixels = std::vector<PixelF>(width * height);
-}
-
-/********************************************************
+/************************************************
  * This is kind of terrible but its okay.
  *
- * First you load the entire image to the data variable.
- * Then you copy the entire thing to an std::vector.
- * Then you return the image class, which creates a new
- * std::vector, copying the image yet again.
- *
- * The full image is copied twice, this would be terrible
+ * The full image is copied, this would be meh
  * for loading a large sequence of images.
  *
- * Do I need an std::vector? I don't need dynamically
- * resizeable arrays. Cropping may not even benefit from
- * a vector.
- ********************************************************/
-ImageI loadImageI(const char *path)
+ ***********************************************/
+ImageI::ImageI(const char *fileName)
 {
-    uint32_t width = 0;
-    uint32_t height = 0;
-    uint32_t nrChannels = 0;
-    unsigned char *data = stbi_load(texturePath, &width, &height, &nrChannels, 0);
+    pixels = NULL;
+    int width;
+    int height;
+    int pixelCount;
+    int nrChannels;
 
-    ImageI image(width, height);
+    // Desired channels is 4, will always convert to an rgba image.
+    unsigned char *data = stbi_load(fileName, &width, &height, &nrChannels, DESIRED_CHANNELS);
+    int dataIndex;
+
     if (data)
     {
-        int dataIndex;
-        if (nrChannels == 3)
+        pixelCount = width * height;
+        this->pixels = new pixel4i_t[pixelCount];
+        if (pixels != NULL)
         {
-            for (int i = 0; i < width * height; i++)
-            {
-                dataIndex = i * 3;
-                image.pixels[i].r = data[dataIndex]
-                image.pixels[i].r = data[dataIndex + 1]
-                image.pixels[i].r = data[dataIndex + 2]
-                image.pixels[i].a = 0;
-            }
-        }
-        if (nrChannels == 4)
-        {
-            for (int i = 0; i < width * height; i++)
+            for (int i = 0; i < pixelCount; i++)
             {
                 dataIndex = i * 4;
-                image.pixels[i].r = data[dataIndex]
-                image.pixels[i].r = data[dataIndex + 1]
-                image.pixels[i].r = data[dataIndex + 2]
-                image.pixels[i].a = data[dataIndex + 3];
+                this->pixels[i].col.r = uint8_t(data[dataIndex]);
+                this->pixels[i].col.g = uint8_t(data[dataIndex + 1]);
+                this->pixels[i].col.b = uint8_t(data[dataIndex + 2]);
+                this->pixels[i].col.a = uint8_t(data[dataIndex + 3]);
             }
+            this->width = width;
+            this->height = height;
+            this->pixelCount = pixelCount;
+            this->aspectRatio = width / height;
         }
+        else
+        {
+            std::cerr << "ERROR: Couldn't allocate memory for the image";
+        }
+        stbi_image_free(data);
     }
     else
     {
-        std::cout << "ERROR: Failed to load image" << std::endl;
+        std::cerr << "ERROR: STBI Failed to load the image" << std::endl;
     }
-    return image;
 }
 
-ImageI toImageI(ImageF& srcImg)
+ImageI::~ImageI()
 {
-    ImageI image(srcImg.width, srcImg.height);
-    for (int i = 0; i < srcImg.pixels.size(); i++)
+    if (pixels != NULL)
     {
-        image.pixels[i].r = int(255.99f * srcImg.pixels[i].r);
-        image.pixels[i].g = int(255.99f * srcImg.pixels[i].g);
-        image.pixels[i].b = int(255.99f * srcImg.pixels[i].b);
-        image.pixels[i].a = int(255.99f * srcImg.pixels[i].a);
+        delete(pixels);
     }
-    return image;
 }
 
-ImageF toImageF(ImageI& srcImg)
+// Copy int to int
+ImageI::ImageI(const ImageI& img)
 {
-    ImageF image(srcImg.width, srcImg.height);
-    float scaler = 1.0f / 255.0f;
-    for (int i = 0; i < srcImg,pixels.size(); i++)
+    this->pixels = new pixel4i_t[img.width * img.height];
+    this->width = img.width;
+    this->height = img.height;
+    this->pixelCount = img.pixelCount;
+    this->aspectRatio = img.aspectRatio;
+    for (int i = 0; i < img.width * img.height; i++)
     {
-        image.pixels[i].r = scalar * float(srcImg.pixels[i].r);
-        image.pixels[i].g = scalar * float(srcImg.pixels[i].g);
-        image.pixels[i].b = scalar * float(srcImg.pixels[i].b);
-        image.pixels[i].a = scalar * float(srcImg.pixels[i].a);
+        this->pixels[i] = img.pixels[i];
     }
-    return image;
 }
+
+// Copy float to int
+ImageI::ImageI(const ImageF& img)
+{
+    this->pixels = new pixel4i_t[img.width * img.height];
+    this->width = img.width;
+    this->height = img.height;
+    this->pixelCount = img.pixelCount;
+    this->aspectRatio = img.aspectRatio;
+    for (int i = 0; i < pixelCount; i++)
+    {
+        this->pixels[i].col.r = std::min(uint8_t(255.99f * img.pixels[i].col.r), uint8_t(255));
+        this->pixels[i].col.g = std::min(uint8_t(255.99f * img.pixels[i].col.g), uint8_t(255));
+        this->pixels[i].col.b = std::min(uint8_t(255.99f * img.pixels[i].col.b), uint8_t(255));
+        this->pixels[i].col.a = std::min(uint8_t(255.99f * img.pixels[i].col.a), uint8_t(255));
+    }
+}
+
+// Copy float to float
+ImageF::ImageF(const ImageF& img)
+{
+    this->pixels = new pixel4f_t[img.width * img.height];
+    this->width = img.width;
+    this->height = img.height;
+    this->pixelCount = img.pixelCount;
+    this->aspectRatio = img.aspectRatio;
+    for (int i = 0; i < pixelCount; i++)
+    {
+        this->pixels[i] = img.pixels[i];
+    }
+}
+
+// Copy int to float
+ImageF::ImageF(const ImageI& img)
+{
+    this->pixels = new pixel4f_t[img.width * img.height];
+    this->width = img.width;
+    this->height = img.height;
+    this->pixelCount = img.pixelCount;
+    this->aspectRatio = img.aspectRatio;
+    float scalar = 1.0f / 255.0f;
+    for (int i = 0; i < pixelCount; i++)
+    {
+        this->pixels[i].col.r = scalar * float(img.pixels[i].col.r);
+        this->pixels[i].col.g = scalar * float(img.pixels[i].col.g);
+        this->pixels[i].col.b = scalar * float(img.pixels[i].col.b);
+        this->pixels[i].col.a = scalar * float(img.pixels[i].col.a);
+    }
+}
+
+ImageF::~ImageF()
+{
+    if (pixels != NULL)
+    {
+        delete(pixels);
+    }
+}
+
+void ImageI::write(const char *filename)
+{
+    stbi_write_png(filename, this->width, this->height, DESIRED_CHANNELS, this->pixels, this->width * sizeof(uint8_t) * 4);
+}
+
+void ImageF::toGreyscale(float rScalar, float gScalar, float bScalar)
+{
+    float avg;
+    for (int i = 0; i < pixelCount; i++)
+    {
+        avg = rScalar * pixels[i].col.r
+            + gScalar * pixels[i].col.g
+            + bScalar * pixels[i].col.b;
+        pixels[i].col.r = avg;
+        pixels[i].col.g = avg;
+        pixels[i].col.b = avg;
+    }
+}
+
+void ImageF::toNegative()
+{
+    float avg;
+    for (int i = 0; i < pixelCount; i++)
+    {
+        pixels[i].col.r = 1.0 - pixels[i].col.r;
+        pixels[i].col.g = 1.0 - pixels[i].col.g;
+        pixels[i].col.b = 1.0 - pixels[i].col.b;
+    }
+}
+

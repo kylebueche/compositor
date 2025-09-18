@@ -8,50 +8,64 @@
 #define IMAGE_H
 
 #include <cstring>
+#include <cstdint>
+#include <iostream>
 
-struct SIMDImageSequence
+const int DESIRED_CHANNELS = 4;
+
+typedef union
 {
-    // List of pixel locations for the first image in the sequence
-    char **r;
-    char **g;
-    char **b;
-    char **a;
-    // Glob of data structured like:
-    //  pixel[i][j]
-    //    -> image[k]
-    char *rawR;
-    char *rawG;
-    char *rawB;
-    char *rawA;
+    struct
+    {
+        uint8_t r;
+        uint8_t g;
+        uint8_t b;
+        uint8_t a;
+    } col;
+    uint8_t array[4];
+} pixel4i_t;
 
 
-struct PixelI
+typedef union
 {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-    uint8_t a;
-} PixelI;
+    struct
+    {
+        float r;
+        float g;
+        float b;
+        float a;
+    } col;
+    float array[4];
+} pixel4f_t;
 
-
-struct PixelF
+typedef union
 {
-    float r;
-    float g;
-    float b;
-    float a;
-} PixelF;
+    struct
+    {
+        float h;
+        float s;
+        float v;
+        float a;
+    } col;
+    float array[4];
+} pixel4f_hsv_t;
+
+class ImageF;
 
 class ImageI
 {
     public:
-        uint32_t width;
-        uint32_t height;
+        unsigned int width;
+        unsigned int height;
+        unsigned int pixelCount;
         float aspectRatio;
-        std::vector<PixelI> pixels;
-
-        ImageI(uint32_t width, uint32_t height);
-        // Not bounds checked. Use responsibly.
+        pixel4i_t *pixels;
+        
+        ImageI(const char*);
+        ImageI(const ImageI&);
+        ImageI(const ImageF&);
+        ~ImageI();
+        void write(const char*);
         inline unsigned int index(unsigned int x, unsigned int y)
         {
             return y * width + x;
@@ -61,21 +75,39 @@ class ImageI
 class ImageF
 {
     public:
-        uint32_t width;
-        uint32_t height;
+        unsigned int width;
+        unsigned int height;
+        unsigned int pixelCount;
         float aspectRatio;
-        std::vector<PixelF> pixels;
+        pixel4f_t *pixels;
 
-        ImageF(uint32_t width, uint32_t height);
-        // Not bounds checked. Use responsibly.
+        ImageF(const ImageF&);
+        ImageF(const ImageI&);
+        ~ImageF();
+        void toGreyscale(float, float, float);
+        void toNegative();
         inline unsigned int index(unsigned int x, unsigned int y)
         {
             return y * width + x;
         }
 };
 
-ImageI loadImageI(const char *path);
-ImageI toImageI(ImageF& srcImg);
-ImageF toImageF(ImageI& srcImg);
+class ImageHSV
+{
+    public:
+        unsigned int width;
+        unsigned int height;
+        unsigned int pixelCount;
+        float aspectRatio;
+        pixel4f_hsv_t *pixels;
+        ImageHSV(const ImageHSV&);
+        ImageHSV(const ImageF&);
+        ImageHSV(const ImageI&);
+        ~ImageHSV();
+        inline unsigned int index(unsigned int x, unsigned int y)
+        {
+            return y * width + x;
+        }
+};
 
 #endif

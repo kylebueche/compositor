@@ -10,7 +10,7 @@ CFLAGS = -MMD -MP -I$(INCLUDES_DIR)
 CFLAGS += -std=c++20
 
 # Windows no cmd line
-CFLAGS += -mwindows
+# CFLAGS += -mwindows
 
 # Extra warnings
 CFLAGS += -Wall -Wextra -pedantic
