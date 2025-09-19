@@ -3,10 +3,11 @@ EXEC_NAME = Main
 SRC_DIR = src
 BUILD_DIR = build
 INCLUDES_DIR = $(SRC_DIR)/includes
+EXTERNAL_DIR = external
 
 # Flags, compiler stuff
 # Necessary project flags
-CFLAGS = -MMD -MP -I$(INCLUDES_DIR)
+CFLAGS = -MMD -MP -I$(INCLUDES_DIR) -I$(EXTERNAL_DIR)
 CFLAGS += -std=c++20
 
 # Windows no cmd line
