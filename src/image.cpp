@@ -8,6 +8,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image.h>
 #include <stb_image_write.h>
+#include <new>
 #include "image.h"
 
 /************************************************
@@ -22,95 +23,88 @@
 
 ImageF::ImageF()
 {
-    this->pixels = NULL;
-    std::cout << "vtable: " << *(void**)this << std::endl;
+    ensureBuffersDeleted();
 }
 
 ImageF::ImageF(const char *filename)
 {
-    this->pixels = NULL;
-    this->buffer(filename);
+    ensureBuffersDeleted();
+    buffer(filename);
 }
 
 // Copy constructor
 ImageF::ImageF(const ImageF& img)
 {
-    this->pixels = NULL;
-    this->buffer(img);
+    ensureBuffersDeleted();
+    buffer(img);
 }
 
 ImageF::~ImageF()
 {
-    if (pixels != NULL)
+    ensureBuffersDeleted();
+}
+
+void ImageF::ensureBuffersDeleted()
+{
+    if (this->pixels != nullptr)
+        delete(this->pixels);
+    if (this->temp != nullptr)
+        delete(this->temp);
+    this->pixels = nullptr;
+    this->temp = nullptr;
+    this->width = 0;
+    this->height = 0;
+    this->pixelCount = 0;
+    this->aspectRatio = 1.0f;
+}
+
+void ImageF::ensureBufferSize(int width, int height)
+{
+    if ((this->width != width || this->height != height)
+        && (width >= 0 && height >= 0))
     {
-        delete(pixels);
+        ensureBuffersDeleted();
+        this->width = width;
+        this->height = height;
+        this->pixelCount = width * height;
+        this->aspectRatio = width / height;
+        pixels = new pixel4f_t[pixelCount];
+        temp = new pixel4f_t[pixelCount];
     }
 }
 
-// From file bufferer
-ImageF::buffer(const char *filename)
+bool ImageF::null()
 {
-    std::cout << "vtable: " << *(void**)this << std::endl;
-    int lwidth;
-    int lheight;
-    int lpixelCount;
-    int lnrChannels;
+    return (pixels == nullptr || temp == nullptr);
+}
+
+// From file bufferer
+void ImageF::buffer(const char *filename)
+{
+    int newWidth;
+    int newHeight;
+    int nrChannels;
 
     // Desired channels is 4, will always convert to an rgba image.
-    unsigned char *data = stbi_load(filename, &lwidth, &lheight, &lnrChannels, NUM_CHANNELS);
-    int dataIndex = 0;
-
+    unsigned char *data = stbi_load(filename, &newWidth, &newHeight, &nrChannels, NUM_CHANNELS);
 
     // Handle stbi loading errors
     if (data)
     {
-        lpixelCount = lwidth * lheight;
-        if (pixels == NULL)
+        ensureBufferSize(newWidth, newHeight);
+        if (null())
+            return;
+
+        int dataIndex = 0;
+        float scalar = 1.0f / 255.0f;
+        for (int i = 0; i < pixelCount; i++)
         {
-            pixels = new pixel4f_t[lpixelCount];
-        }
-        else
-        {
-            // Don't reallocate if the new image is the same size as this buffer
-            if (lpixelCount != this->pixelCount)
-            {
-                delete(pixels);
-                pixels = new pixel4f_t[lpixelCount];
-            }
-        }
-        std::cout << "Width: " << lwidth << std::endl;
-        std::cout << "Height: " << lheight << std::endl;
-        std::cout << "Width * Height: " << lwidth * lheight << std::endl;
-        std::cout << "Pixel count: " << lpixelCount << std::endl;
-        void* t = *(void**)this;
-        // Handle dynamic allocation failure
-        if (pixels != NULL)
-        {
-            std::cout << "HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII: " << *(void**)this << std::endl;
-            std::cout << "vtable: " << *(void**)this << std::endl;
-            float scalar = 1.0f / 255.0f;
-            std::cout << "pixel count: " << lpixelCount <<std::endl;
-            for (int i = 0; i < lpixelCount; i++)
-            {
-                dataIndex = i * 4;
-                pixels[i].col.r = scalar * float(data[dataIndex]);
-                pixels[i].col.g = scalar * float(data[dataIndex + 1]);
-                pixels[i].col.b = scalar * float(data[dataIndex + 2]);
-                pixels[i].col.a = scalar * float(data[dataIndex + 3]);
-                if (*(void**)this != t)
-                {
-                    std::cout << "CORRUPTION AT: " << i << std::endl;
-                }
-            }
-            this->width = lwidth;
-            this->height = lheight;
-            this->pixelCount = lpixelCount;
-            this->aspectRatio = lwidth / lheight;
-            std::cout << "vtable: " << *(void**)this << std::endl;
-        }
-        else
-        {
-            std::cerr << "ERROR: Couldn't allocate memory for the image";
+            dataIndex = i * 4;
+            pixels[i].col.r = scalar * float(data[dataIndex]);
+            pixels[i].col.g = scalar * float(data[dataIndex + 1]);
+            pixels[i].col.b = scalar * float(data[dataIndex + 2]);
+            pixels[i].col.a = scalar * float(data[dataIndex + 3]);
+            temp[i].col = pixels[i].col;
         }
         stbi_image_free(data);
     }
@@ -118,45 +112,25 @@ ImageF::buffer(const char *filename)
     {
         std::cerr << "ERROR: STBI Failed to load the image" << std::endl;
     }
-    std::cout << "hi2" << std::endl;
-    std::cout << "vtable: " << *(void**)this << std::endl;
 }
 
 // Copy bufferer
-ImageF::buffer(const ImageF& img)
+void ImageF::buffer(const ImageF& img)
 {
-    if (pixels == NULL)
+    ensureBufferSize(img.width, img.height);
+    if (null())
+        return;
+
+    for (int i = 0; i < pixelCount; i++)
     {
-        this->pixels = new pixel4f_t[img.pixelCount];
-    }
-    else
-    {
-        // Don't reallocate if the new image is the same size as this buffer
-        if (img.pixelCount != this->pixelCount)
-        {
-            delete(pixels);
-            this->pixels = new pixel4f_t[img.pixelCount];
-        }
-    }
-    if (pixels != NULL)
-    {
-        this->width = img.width;
-        this->height = img.height;
-        this->pixelCount = img.pixelCount;
-        this->aspectRatio = img.aspectRatio;
-        for (int i = 0; i < pixelCount; i++)
-        {
-            this->pixels[i] = img.pixels[i];
-        }
-    }
-    else
-    {
-        std::cerr << "ERROR: Couldn't allocate memory for the image";
+        this->pixels[i] = img.pixels[i];
     }
 }
 
 void ImageF::write(const char *filename)
 {
+    if (null())
+        return;
     pixel4i_t *intBuffer = new pixel4i_t[pixelCount];
     for (int i = 0; i < pixelCount; i++)
     {
@@ -169,27 +143,35 @@ void ImageF::write(const char *filename)
     delete(intBuffer);
 }
 
+void ImageF::apply()
+{
+    std::swap<pixel4f_t*>(pixels, temp);
+}
+
 void ImageF::toGreyscale(float rScalar, float gScalar, float bScalar)
 {
-    std::cout << "1";
+    if (null())
+        return;
     float avg;
     for (int i = 0; i < pixelCount; i++)
     {
         avg = rScalar * pixels[i].col.r
             + gScalar * pixels[i].col.g
             + bScalar * pixels[i].col.b;
-        pixels[i].col.r = avg;
-        pixels[i].col.g = avg;
-        pixels[i].col.b = avg;
+        temp[i].col.r = avg;
+        temp[i].col.g = avg;
+        temp[i].col.b = avg;
     }
 }
 
 void ImageF::toNegative()
 {
+    if (null())
+        return;
     for (int i = 0; i < pixelCount; i++)
     {
-        pixels[i].col.r = 1.0 - pixels[i].col.r;
-        pixels[i].col.g = 1.0 - pixels[i].col.g;
-        pixels[i].col.b = 1.0 - pixels[i].col.b;
+        temp[i].col.r = 1.0 - pixels[i].col.r;
+        temp[i].col.g = 1.0 - pixels[i].col.g;
+        temp[i].col.b = 1.0 - pixels[i].col.b;
     }
 }

@@ -10,8 +10,10 @@ EXTERNAL_DIR = external
 CFLAGS = -MMD -MP -I$(INCLUDES_DIR) -I$(EXTERNAL_DIR)
 CFLAGS += -std=c++20
 
-debug: CFLAGS += -O0 -g
-debug: $(EXEC_NAME)
+d ?= 0
+ifeq ($(d), 1)
+	CFLAGS += -O0 -g
+endif
 
 # Windows no cmd line
 # CFLAGS += -mwindows

@@ -58,14 +58,19 @@ class ImageF
         unsigned int pixelCount;
         float aspectRatio;
         pixel4f_t *pixels;
+        pixel4f_t *temp;
 
         ImageF();
         ImageF(const char*);
         ImageF(const ImageF&);
         ~ImageF();
-        buffer(const char*);
-        buffer(const ImageF&);
+        void ensureBuffersDeleted();
+        void ensureBufferSize(int, int);
+        bool null();
+        void buffer(const char*);
+        void buffer(const ImageF&);
         void write(const char*);
+        void apply();
         void toGreyscale(float, float, float);
         void toNegative();
         inline unsigned int index(unsigned int x, unsigned int y)

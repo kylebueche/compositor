@@ -30,7 +30,7 @@ void loadTexture(ImageF& image, GLuint& texture)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_FLOAT, image.pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_FLOAT, image.temp);
 }
 
 int main()
@@ -51,7 +51,7 @@ int main()
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(0); // Enable vsync
+    glfwSwapInterval(1); // Enable vsync
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -70,14 +70,6 @@ int main()
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    GLuint texture = 0;
-
-    char textBuffer[1024] = "";
-
-    ImageF image;
-    image.buffer("image.jpg");
-
-    std::cout << "hi";
 
     while (!glfwWindowShouldClose(window))
     {
@@ -95,25 +87,32 @@ int main()
             ImGui::ShowDemoWindow(&show_demo_window);
 
         {
-            static float r = 0.0f;
-            static float g = 0.0f;
-            static float b = 0.0f;
+            static GLuint texture = 0;
+            static char textBuffer[1024] = "";
+            static ImageF image;
+            static float r = 0.33f;
+            static float g = 0.33f;
+            static float b = 0.33f;
             static bool textureLoaded = false;
             ImGui::Begin("Hello, world!");
             ImGui::Checkbox("Demo Window", &show_demo_window);
             ImGui::Checkbox("Another Window", &show_another_window);
+            ImGui::Text("Application average %.ef ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
             ImGui::Text("Choose different weights for converting to greyscale");
-            ImGui::SliderFloat("r", &r, 0.0f, 1.0f);
-            ImGui::SliderFloat("g", &g, 0.0f, 1.0f);
-            ImGui::SliderFloat("b", &b, 0.0f, 1.0f);
+            if(ImGui::SliderFloat("r", &r, 0.0f, 1.0f)
+               | ImGui::SliderFloat("g", &g, 0.0f, 1.0f)
+               | ImGui::SliderFloat("b", &b, 0.0f, 1.0f))
+            {
+                image.toGreyscale(r, g, b);
+                loadTexture(image, texture);
+            }
+                
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
             ImGui::InputText("File Name", textBuffer, sizeof(textBuffer));
             if (ImGui::Button("Open File"))
             {
-                std::cout << textBuffer;
                 image.buffer(textBuffer);
-                std::cout << "hi";
                 loadTexture(image, texture);
                 textureLoaded = true;
             }
@@ -123,13 +122,6 @@ int main()
                 ImGui::Image((void *)(intptr_t)texture, ImVec2(image.width, image.height));
             }
             
-            if (ImGui::Button("Button"))
-            {
-                image.toGreyscale(r, g, b);
-                loadTexture(image, texture);
-            }
-            ImGui::SameLine();
-            ImGui::Text("Application average %.ef ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
 
