@@ -23,25 +23,31 @@
 
 ImageF::ImageF()
 {
-    ensureBuffersDeleted();
+    ensureBuffersNull();
 }
 
 ImageF::ImageF(const char *filename)
 {
-    ensureBuffersDeleted();
+    ensureBuffersNull();
     buffer(filename);
 }
 
 // Copy constructor
 ImageF::ImageF(const ImageF& img)
 {
-    ensureBuffersDeleted();
+    ensureBuffersNull();
     buffer(img);
 }
 
 ImageF::~ImageF()
 {
     ensureBuffersDeleted();
+}
+
+void ImageF::ensureBuffersNull()
+{
+    this->pixels = nullptr;
+    this->temp = nullptr;
 }
 
 void ImageF::ensureBuffersDeleted()

@@ -64,6 +64,7 @@ class ImageF
         ImageF(const char*);
         ImageF(const ImageF&);
         ~ImageF();
+        void ensureBuffersNull();
         void ensureBuffersDeleted();
         void ensureBufferSize(int, int);
         bool null();

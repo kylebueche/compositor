@@ -27,6 +27,7 @@ void loadTexture(ImageF& image, GLuint& texture)
     glGenTextures(1, &texture);
     glBindTexture(1, texture);
     glBindTexture(GL_TEXTURE_2D, texture);
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
@@ -70,6 +71,26 @@ int main()
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    ImageF image;
+    GLuint texture = 0;
+    float r = 0.33f;
+    float g = 0.33f;
+    float b = 0.33f;
+    bool textureLoaded = false;
+    bool runThread = true;
+    bool updateImg = false;
+    std::thread greyscaleThread([&]()
+        {
+            while (runThread)
+            {
+                if (updateImg)
+                {
+                    image.toGreyscale(r, g, b);
+                    loadTexture(image, texture);
+                }
+            }
+        });
+    greyscaleThread.detach();
 
     while (!glfwWindowShouldClose(window))
     {
@@ -87,13 +108,8 @@ int main()
             ImGui::ShowDemoWindow(&show_demo_window);
 
         {
-            static GLuint texture = 0;
             static char textBuffer[1024] = "";
-            static ImageF image;
-            static float r = 0.33f;
-            static float g = 0.33f;
-            static float b = 0.33f;
-            static bool textureLoaded = false;
+;
             ImGui::Begin("Hello, world!");
             ImGui::Checkbox("Demo Window", &show_demo_window);
             ImGui::Checkbox("Another Window", &show_another_window);
@@ -104,8 +120,11 @@ int main()
                | ImGui::SliderFloat("g", &g, 0.0f, 1.0f)
                | ImGui::SliderFloat("b", &b, 0.0f, 1.0f))
             {
-                image.toGreyscale(r, g, b);
-                loadTexture(image, texture);
+                updateImg = true;
+            }
+            else
+            {
+                updateImg = false;
             }
                 
             ImGui::ColorEdit3("clear color", (float*)&clear_color);
