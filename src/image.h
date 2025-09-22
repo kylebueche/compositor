@@ -59,11 +59,13 @@ class ImageF
         float aspectRatio;
         pixel4f_t *pixels;
 
+        ImageF();
         ImageF(const char*);
         ImageF(const ImageF&);
         ~ImageF();
         buffer(const char*);
         buffer(const ImageF&);
+        void write(const char*);
         void toGreyscale(float, float, float);
         void toNegative();
         inline unsigned int index(unsigned int x, unsigned int y)
@@ -82,7 +84,6 @@ class ImageHSV
         pixel4f_hsv_t *pixels;
         ImageHSV(const ImageHSV&);
         ImageHSV(const ImageF&);
-        ImageHSV(const ImageI&);
         ~ImageHSV();
         inline unsigned int index(unsigned int x, unsigned int y)
         {

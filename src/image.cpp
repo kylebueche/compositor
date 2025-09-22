@@ -19,6 +19,13 @@
  ***********************************************/
 
 // From file constructor
+
+ImageF::ImageF()
+{
+    this->pixels = NULL;
+    std::cout << "vtable: " << *(void**)this << std::endl;
+}
+
 ImageF::ImageF(const char *filename)
 {
     this->pixels = NULL;
@@ -28,6 +35,7 @@ ImageF::ImageF(const char *filename)
 // Copy constructor
 ImageF::ImageF(const ImageF& img)
 {
+    this->pixels = NULL;
     this->buffer(img);
 }
 
@@ -42,48 +50,63 @@ ImageF::~ImageF()
 // From file bufferer
 ImageF::buffer(const char *filename)
 {
-    int width;
-    int height;
-    int pixelCount;
-    int nrChannels;
+    std::cout << "vtable: " << *(void**)this << std::endl;
+    int lwidth;
+    int lheight;
+    int lpixelCount;
+    int lnrChannels;
 
     // Desired channels is 4, will always convert to an rgba image.
-    unsigned char *data = stbi_load(filename, &width, &height, &nrChannels, NUM_CHANNELS);
-    int dataIndex;
+    unsigned char *data = stbi_load(filename, &lwidth, &lheight, &lnrChannels, NUM_CHANNELS);
+    int dataIndex = 0;
+
 
     // Handle stbi loading errors
     if (data)
     {
-        pixelCount = width * height;
+        lpixelCount = lwidth * lheight;
         if (pixels == NULL)
         {
-            pixels = new pixel4f_t[pixelCount];
+            pixels = new pixel4f_t[lpixelCount];
         }
         else
         {
             // Don't reallocate if the new image is the same size as this buffer
-            if (pixelCount != this->pixelCount)
+            if (lpixelCount != this->pixelCount)
             {
                 delete(pixels);
-                pixels = new pixel4f_t[pixelCount];
+                pixels = new pixel4f_t[lpixelCount];
             }
         }
+        std::cout << "Width: " << lwidth << std::endl;
+        std::cout << "Height: " << lheight << std::endl;
+        std::cout << "Width * Height: " << lwidth * lheight << std::endl;
+        std::cout << "Pixel count: " << lpixelCount << std::endl;
+        void* t = *(void**)this;
         // Handle dynamic allocation failure
         if (pixels != NULL)
         {
+            std::cout << "HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII: " << *(void**)this << std::endl;
+            std::cout << "vtable: " << *(void**)this << std::endl;
             float scalar = 1.0f / 255.0f;
-            for (int i = 0; i < pixelCount; i++)
+            std::cout << "pixel count: " << lpixelCount <<std::endl;
+            for (int i = 0; i < lpixelCount; i++)
             {
                 dataIndex = i * 4;
                 pixels[i].col.r = scalar * float(data[dataIndex]);
                 pixels[i].col.g = scalar * float(data[dataIndex + 1]);
                 pixels[i].col.b = scalar * float(data[dataIndex + 2]);
                 pixels[i].col.a = scalar * float(data[dataIndex + 3]);
+                if (*(void**)this != t)
+                {
+                    std::cout << "CORRUPTION AT: " << i << std::endl;
+                }
             }
-            this->width = width;
-            this->height = height;
-            this->pixelCount = pixelCount;
-            this->aspectRatio = width / height;
+            this->width = lwidth;
+            this->height = lheight;
+            this->pixelCount = lpixelCount;
+            this->aspectRatio = lwidth / lheight;
+            std::cout << "vtable: " << *(void**)this << std::endl;
         }
         else
         {
@@ -95,6 +118,8 @@ ImageF::buffer(const char *filename)
     {
         std::cerr << "ERROR: STBI Failed to load the image" << std::endl;
     }
+    std::cout << "hi2" << std::endl;
+    std::cout << "vtable: " << *(void**)this << std::endl;
 }
 
 // Copy bufferer
@@ -130,15 +155,15 @@ ImageF::buffer(const ImageF& img)
     }
 }
 
-void ImageI::write(const char *filename)
+void ImageF::write(const char *filename)
 {
     pixel4i_t *intBuffer = new pixel4i_t[pixelCount];
     for (int i = 0; i < pixelCount; i++)
     {
-        intBuffer[i].col.r = std::min(uint8_t(255.99f * img.pixels[i].col.r), uint8_t(255));
-        intBuffer[i].col.g = std::min(uint8_t(255.99f * img.pixels[i].col.g), uint8_t(255));
-        intBuffer[i].col.b = std::min(uint8_t(255.99f * img.pixels[i].col.b), uint8_t(255));
-        intBuffer[i].col.a = std::min(uint8_t(255.99f * img.pixels[i].col.a), uint8_t(255));
+        intBuffer[i].col.r = std::min(uint8_t(255.99f * intBuffer[i].col.r), uint8_t(255));
+        intBuffer[i].col.g = std::min(uint8_t(255.99f * intBuffer[i].col.g), uint8_t(255));
+        intBuffer[i].col.b = std::min(uint8_t(255.99f * intBuffer[i].col.b), uint8_t(255));
+        intBuffer[i].col.a = std::min(uint8_t(255.99f * intBuffer[i].col.a), uint8_t(255));
     }
     stbi_write_png(filename, this->width, this->height, NUM_CHANNELS, intBuffer, this->width * sizeof(uint8_t) * NUM_CHANNELS);
     delete(intBuffer);
@@ -146,6 +171,7 @@ void ImageI::write(const char *filename)
 
 void ImageF::toGreyscale(float rScalar, float gScalar, float bScalar)
 {
+    std::cout << "1";
     float avg;
     for (int i = 0; i < pixelCount; i++)
     {

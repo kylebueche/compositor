@@ -10,6 +10,9 @@ EXTERNAL_DIR = external
 CFLAGS = -MMD -MP -I$(INCLUDES_DIR) -I$(EXTERNAL_DIR)
 CFLAGS += -std=c++20
 
+debug: CFLAGS += -O0 -g
+debug: $(EXEC_NAME)
+
 # Windows no cmd line
 # CFLAGS += -mwindows
 
@@ -17,7 +20,7 @@ CFLAGS += -std=c++20
 CFLAGS += -Wall -Wextra -pedantic
 # CFLAGS += -Werror
 
-LIBS =
+LIBS = -lglfw3 -lgdi32 -lopengl32 -limm32
 
 # Obtain all source, object, and dependency files
 SRC = $(wildcard $(SRC_DIR)/*.cpp)
