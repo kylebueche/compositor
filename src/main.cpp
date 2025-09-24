@@ -15,12 +15,44 @@
 #define GL_SILENCE_DEPRACATION
 #include <GLFW/glfw3.h>
 
+typedef enum
+{
+    NONE,
+    BUFFER,
+    APPLY,
+    WRITE,
+    TOGREYSCALE,
+    TONEGATIVE,
+    SCALECONTRAST,
+    COLORTINT,
+    THRESHOLD,
+    ADJUSTHSV,
+    ROTATEHUE,
+    SCALESATURATION,
+    SCALEVALUE,
+} IMGEditType;
+
+
 static void glfw_error_callback(int error, const char* description)
 {
     std::cerr << "GLFW Error " << error << ": " << description << std::endl;
 }
 
 void loadTexture(ImageF& image, GLuint& texture)
+{
+    if (texture)
+        glDeleteTextures(1, &texture);
+    glGenTextures(1, &texture);
+    glBindTexture(1, texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_FLOAT, image.pixels);
+}
+
+void loadTempTexture(ImageF& image, GLuint& texture)
 {
     if (texture)
         glDeleteTextures(1, &texture);
@@ -67,30 +99,89 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    bool show_demo_window = true;
-    bool show_another_window = false;
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    bool show_demo_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     ImageF image;
-    GLuint texture = 0;
-    float r = 0.33f;
-    float g = 0.33f;
-    float b = 0.33f;
+    GLuint inputTexture = 0;
+    GLuint outputTexture = 0;
+    bool reloadTexture = false;
+    bool reloadTextureTemp = false;
+    float threshold = 0.5f;
+    float greyR = 0.33f;
+    float greyG = 0.33f;
+    float greyB = 0.33f;
+    float tintR = 1.0f;
+    float tintG = 0.0f;
+    float tintB = 0.0f;
+    float tintA = 0.10f;
+    float contrast = 1.0f;
+    char readFilename[1024] = "";
+    char writeFilename[1024] = "";
+    float h = 0.0f;
+    float s = 1.0f;
+    float v = 1.0f;
+
     bool textureLoaded = false;
-    bool runThread = true;
-    bool updateImg = false;
-    std::thread greyscaleThread([&]()
+    bool updateComplete = false;
+    std::atomic<IMGEditType> editType = NONE;
+    std::thread imageProcessingThread([&]()
+    {
+        bool runThread = true;
+        while (runThread)
         {
-            while (runThread)
+            switch (editType)
             {
-                if (updateImg)
-                {
-                    image.toGreyscale(r, g, b);
-                    loadTexture(image, texture);
-                }
+                case NONE:
+                    break;
+                case BUFFER:
+                    image.buffer(readFilename);
+                    reloadTexture = true;
+                    break;
+                case APPLY:
+                    image.apply();
+                    reloadTexture = true;
+                    reloadTextureTemp = true;
+                    // Prevent double swapping
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    break;
+                case WRITE:
+                    image.write(writeFilename);
+                    reloadTexture = true;
+                    reloadTextureTemp = true;
+                    break;
+                case TOGREYSCALE:
+                    image.toGreyscale(greyR, greyG, greyB);
+                    reloadTextureTemp = true;
+                    break;
+                case TONEGATIVE:
+                    image.toNegative();
+                    reloadTextureTemp = true;
+                    break;
+                case SCALECONTRAST:
+                    image.scaleContrast(contrast);
+                    reloadTextureTemp = true;
+                    break;
+                case COLORTINT:
+                    image.colorTint(tintR, tintB, tintG, tintA);
+                    reloadTextureTemp = true;
+                    break;
+                case THRESHOLD:
+                    image.threshold(threshold);
+                    reloadTextureTemp = true;
+                    break;
+                case ADJUSTHSV:
+                    image.adjustHSV(h, s, v);
+                    reloadTextureTemp = true;
+                    break;
+                default:
+                    break;
             }
-        });
-    greyscaleThread.detach();
+        }
+    });
+    imageProcessingThread.detach();
+
 
     while (!glfwWindowShouldClose(window))
     {
@@ -107,52 +198,122 @@ int main()
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
+        if (reloadTexture)
         {
-            static char textBuffer[1024] = "";
-;
-            ImGui::Begin("Hello, world!");
-            ImGui::Checkbox("Demo Window", &show_demo_window);
-            ImGui::Checkbox("Another Window", &show_another_window);
-            ImGui::Text("Application average %.ef ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            loadTexture(image, inputTexture);
+            reloadTexture = false;
+            textureLoaded = true;
+            editType = NONE;
+        }
 
-            ImGui::Text("Choose different weights for converting to greyscale");
-            if(ImGui::SliderFloat("r", &r, 0.0f, 1.0f)
-               | ImGui::SliderFloat("g", &g, 0.0f, 1.0f)
-               | ImGui::SliderFloat("b", &b, 0.0f, 1.0f))
-            {
-                updateImg = true;
-            }
-            else
-            {
-                updateImg = false;
-            }
-                
-            ImGui::ColorEdit3("clear color", (float*)&clear_color);
-            ImGui::InputText("File Name", textBuffer, sizeof(textBuffer));
+        if (reloadTextureTemp)
+        {
+            loadTempTexture(image, outputTexture);
+            reloadTextureTemp = false;
+            editType = NONE;
+        }
+
+        // Main window
+        {
+            ImGui::SetNextWindowPos(viewport->Pos);
+            ImGui::SetNextWindowSize(viewport->Size);
+;
+            ImGui::Begin("Compositor!");
+            ImGui::Checkbox("Demo Window", &show_demo_window);
+            ImGui::Text("Application average %.ef ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::InputText("File Name", readFilename, sizeof(readFilename));
+            ImGui::SameLine();
             if (ImGui::Button("Open File"))
             {
-                image.buffer(textBuffer);
-                loadTexture(image, texture);
-                textureLoaded = true;
+                editType = BUFFER;
             }
-            
+
             if (textureLoaded)
             {
-                ImGui::Image((void *)(intptr_t)texture, ImVec2(image.width, image.height));
+                static float imgWidth = 1000.0f;
+                static float imgHeight = imgWidth / image.aspectRatio;
+                ImGui::Image((void *)(intptr_t)inputTexture, ImVec2(imgWidth, imgHeight));
+                ImGui::SameLine();
+                ImGui::Image((void *)(intptr_t)outputTexture, ImVec2(imgWidth, imgHeight));
             }
+
+            static IMGEditType editor = NONE;
+            ImGui::Text("Choose an edit to make:");
+            ImGui::RadioButton("Make Greyscale", (int*)&editor, (int)TOGREYSCALE);
+            ImGui::RadioButton("Make Negative", (int*)&editor, (int)TONEGATIVE);
+            ImGui::RadioButton("Adjust Contrast", (int*)&editor, (int)SCALECONTRAST);
+            ImGui::RadioButton("Adjust Tint", (int*)&editor, (int)COLORTINT);
+            ImGui::RadioButton("Threshold Image", (int*)&editor, (int)THRESHOLD);
+            ImGui::RadioButton("Adjust HSV", (int*)&editor, (int)ADJUSTHSV);
+
+            switch (editor)
+            {
+                case TOGREYSCALE:
+                    ImGui::Text("Choose different weights for converting to greyscale");
+
+                    if(ImGui::SliderFloat("r", &greyR, 0.0f, 1.0f)
+                       | ImGui::SliderFloat("g", &greyG, 0.0f, 1.0f)
+                       | ImGui::SliderFloat("b", &greyB, 0.0f, 1.0f))
+                    {
+                        editType = TOGREYSCALE;
+                    }
+                    break;
+                case TONEGATIVE:
+                    if (ImGui::Button("Negate Image"))
+                    {
+                        editType = TONEGATIVE;
+                    }
+                    break;
+                case SCALECONTRAST:
+                    if (ImGui::SliderFloat("Contrast", &contrast, 0.0f, 5.0f))
+                    {
+                        editType = SCALECONTRAST;
+                    }
+                    break;
+                case COLORTINT:
+                    if (ImGui::SliderFloat("R", &tintR, 0.0f, 1.0f)
+                        | ImGui::SliderFloat("G", &tintG, 0.0f, 1.0f)
+                        | ImGui::SliderFloat("B", &tintB, 0.0f, 1.0f)
+                        | ImGui::SliderFloat("A", &tintA, 0.0f, 1.0f))
+                    {
+                        editType = COLORTINT;
+                    }
+                    break;
+                case THRESHOLD:
+                    if (ImGui::SliderFloat("Threshold", &threshold, 0.0f, 1.0f))
+                    {
+                        editType = THRESHOLD;
+                    }
+                    break;
+                case ADJUSTHSV:
+                    if (ImGui::SliderFloat("Hue", &h, 0.0f, 360.0f)
+                        | ImGui::SliderFloat("Saturation", &s, 0.0f, 1.0f)
+                        | ImGui::SliderFloat("Value", &v, 0.0f, 1.0f))
+                    {
+                        editType = ADJUSTHSV;
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+                    
             
+            if (ImGui::Button("Apply Changes"))
+            {
+                editType = APPLY;
+            }
+
+            ImGui::InputText("File Output Name", writeFilename, sizeof(writeFilename));
+            ImGui::SameLine();
+            if (ImGui::Button("Write File"))
+            {
+                editType = WRITE;
+            }
             ImGui::End();
         }
 
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);
-            ImGui::Text("Hello another window");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
-
+        // Start rendering
         ImGui::Render();
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
@@ -165,6 +326,10 @@ int main()
     }
 
     // Cleanup
+    if (inputTexture)
+        glDeleteTextures(1, &inputTexture);
+    if (outputTexture)
+        glDeleteTextures(1, &outputTexture);
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

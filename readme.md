@@ -1,8 +1,9 @@
-# A GCC + Makefile Template for Writing C++ Code
+# A Compositor for VFX
 
- - Clone this repository
- - make manages dependencies in src/ automatically!
-
- The dependencies and object files are stored in the build directory.
- 
- Anything in src is automatically compiled, subdirectories must be handled explicitely
+Current Features:
+- Greyscale
+- Negative
+- Contrast
+- Tint
+- HSV
+- Threshold
