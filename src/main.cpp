@@ -30,6 +30,8 @@ typedef enum
     ROTATEHUE,
     SCALESATURATION,
     SCALEVALUE,
+    GAUSSIANBLUR,
+    BLOOM
 } IMGEditType;
 
 
@@ -116,12 +118,16 @@ int main()
     float tintG = 0.0f;
     float tintB = 0.0f;
     float tintA = 0.10f;
-    float contrast = 1.0f;
+    float contrastLower = 0.0f;
+    float contrastUpper = 1.0f;
     char readFilename[1024] = "";
     char writeFilename[1024] = "";
     float h = 0.0f;
     float s = 1.0f;
     float v = 1.0f;
+    int kernel = 61;
+    float bloomThreshold = 0.5f;
+    int bloomKernel = 61;
 
     bool textureLoaded = false;
     bool updateComplete = false;
@@ -160,7 +166,7 @@ int main()
                     reloadTextureTemp = true;
                     break;
                 case SCALECONTRAST:
-                    image.scaleContrast(contrast);
+                    image.scaleContrast(contrastLower, contrastUpper);
                     reloadTextureTemp = true;
                     break;
                 case COLORTINT:
@@ -173,6 +179,14 @@ int main()
                     break;
                 case ADJUSTHSV:
                     image.adjustHSV(h, s, v);
+                    reloadTextureTemp = true;
+                    break;
+                case GAUSSIANBLUR:
+                    image.gaussianBlur(kernel);
+                    reloadTextureTemp = true;
+                    break;
+                case BLOOM:
+                    image.bloom(bloomThreshold, bloomKernel);
                     reloadTextureTemp = true;
                     break;
                 default:
@@ -240,11 +254,20 @@ int main()
             static IMGEditType editor = NONE;
             ImGui::Text("Choose an edit to make:");
             ImGui::RadioButton("Make Greyscale", (int*)&editor, (int)TOGREYSCALE);
+            ImGui::SameLine();
             ImGui::RadioButton("Make Negative", (int*)&editor, (int)TONEGATIVE);
+            ImGui::SameLine();
             ImGui::RadioButton("Adjust Contrast", (int*)&editor, (int)SCALECONTRAST);
+            ImGui::SameLine();
             ImGui::RadioButton("Adjust Tint", (int*)&editor, (int)COLORTINT);
+            ImGui::SameLine();
             ImGui::RadioButton("Threshold Image", (int*)&editor, (int)THRESHOLD);
+            ImGui::SameLine();
             ImGui::RadioButton("Adjust HSV", (int*)&editor, (int)ADJUSTHSV);
+            ImGui::SameLine();
+            ImGui::RadioButton("Gaussian Blur Image", (int*)&editor, (int)GAUSSIANBLUR);
+            ImGui::SameLine();
+            ImGui::RadioButton("Add Bloom", (int*)&editor, (int)BLOOM);
 
             switch (editor)
             {
@@ -265,7 +288,8 @@ int main()
                     }
                     break;
                 case SCALECONTRAST:
-                    if (ImGui::SliderFloat("Contrast", &contrast, 0.0f, 5.0f))
+                    if (ImGui::SliderFloat("Lower Bound", &contrastLower, -1.0f, 5.0f)
+                        | ImGui::SliderFloat("Upper Bound", &contrastUpper, 0.0f, 4.0f))
                     {
                         editType = SCALECONTRAST;
                     }
@@ -291,6 +315,19 @@ int main()
                         | ImGui::SliderFloat("Value", &v, 0.0f, 1.0f))
                     {
                         editType = ADJUSTHSV;
+                    }
+                    break;
+                case GAUSSIANBLUR:
+                    if (ImGui::SliderInt("Kernel Size", &kernel, 0, 500))
+                    {
+                        editType = GAUSSIANBLUR;
+                    }
+                    break;
+                case BLOOM:
+                    if (ImGui::SliderInt("Bloom Kernel", &bloomKernel, 0, 500)
+                        | ImGui::SliderFloat("Bloom Threshold", &bloomThreshold, 0.0f, 1.0f))
+                    {
+                        editType = BLOOM;
                     }
                     break;
                 default:

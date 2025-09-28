@@ -13,45 +13,33 @@
 
 const int NUM_CHANNELS = 4;
 
-typedef union
+typedef struct
 {
-    struct
-    {
-        uint8_t r;
-        uint8_t g;
-        uint8_t b;
-        uint8_t a;
-    } col;
-    uint8_t array[4];
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
 } pixel4i_t;
 
 
-typedef union
+typedef struct
 {
-    struct
-    {
-        float r;
-        float g;
-        float b;
-        float a;
-    } col;
-    float array[4];
+    float r;
+    float g;
+    float b;
+    float a;
 } pixel4f_t;
 
-typedef union
+typedef struct
 {
-    struct
-    {
-        float h;
-        float s;
-        float v;
-        float a;
-    } col;
-    float array[4];
+    float h;
+    float s;
+    float v;
+    float a;
 } pixel4f_hsv_t;
 
-pixel4f_hsv_t pixelRGBAtoHSVA(const pixel4f_t&);
-pixel4f_t pixelHSVAtoRGBA(const pixel4f_hsv_t&);
+pixel4f_hsv_t pixelRGBAtoHSVA(const pixel4f_t& pixel);
+pixel4f_t pixelHSVAtoRGBA(const pixel4f_hsv_t& pixel);
 
 class ImageHSV;
 
@@ -64,28 +52,56 @@ class ImageF
         float aspectRatio;
         pixel4f_t *pixels;
         pixel4f_t *temp;
+        pixel4f_t *output;
 
         ImageF();
         ~ImageF();
         void ensureBuffersNull();
         void ensureBuffersDeleted();
-        void ensureBufferSize(int, int);
-        bool null();
-        void buffer(const char*); // Load image from file
-        void buffer(const ImageF&); // Copy RGBA image to RGBA image
+        void ensureBufferSize(int width, int height);
+        const bool null() const;
+        void buffer(const char* filename); // Load image from file
+        void buffer(const ImageF& image); // Copy RGBA image to RGBA image
         //void buffer(const ImageHSV&); // Convert HSVA image to RGBA image
         //void bufferTemp(const ImageHSV&); // Buffer from temp to temp instead
-        void write(const char*); // Write image to file
+        void write(const char* filename); // Write image to file
         void apply(); // Swap ptrs of pixels & temp to apply changes
-        void toGreyscale(float, float, float);
+        void toGreyscale(float rWeight, float gWeight, float bWeight);
         void toNegative();
-        void scaleContrast(float);
-        void colorTint(float, float, float, float);
-        void threshold(float);
-        void adjustHSV(float, float, float);
-        void rotateHue(float);
-        void scaleSaturation(float);
-        void scaleValue(float);
+        pixel4f_t max();
+        pixel4f_t min();
+        void scaleContrast(float lowerBound, float upperBound);
+        void colorTint(float r, float g, float b, float a);
+        void threshold(float a);
+        void adjustHSV(float hueShift, float saturationScale, float valueScale);
+        void rotateHue(float shift);
+        void scaleSaturation(float scale);
+        void scaleValue(float scale);
+        void gaussianBlur(int kernel);
+        void blendForeground(const ImageF& image);
+        void add(const ImageF& image);
+        void bloom(float threshold, int kernel);
+        inline int index(int x, int y)
+        {
+            // Mirror index along edges if out of bounds
+            if (x < 0)
+            {
+                x = - x;
+            }
+            else if (x > width - 1)
+            {
+                x = width - 1 - (x - width);
+            }
+            if (y < 0)
+            {
+                y = - y;
+            }
+            else if (y > height - 1)
+            {
+                y = height - 1 - (y - height);
+            }
+            return y * width + x;
+        }
 };
 
 //class ImageHSV
