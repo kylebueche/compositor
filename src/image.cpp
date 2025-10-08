@@ -276,10 +276,10 @@ void ImageF::write(const char *filename)
     pixel4i_t *intBuffer = new pixel4i_t[pixelCount];
     for (int i = 0; i < pixelCount; i++)
     {
-        intBuffer[i].r = uint8_t(255.99f * std::max(std::min(pixels[i].r, 1.0f), 0.0f));
-        intBuffer[i].g = uint8_t(255.99f * std::max(std::min(pixels[i].g, 1.0f), 0.0f));
-        intBuffer[i].b = uint8_t(255.99f * std::max(std::min(pixels[i].b, 1.0f), 0.0f));
-        intBuffer[i].a = uint8_t(255.99f * std::max(std::min(pixels[i].a, 1.0f), 0.0f));
+        intBuffer[i].r = uint8_t(255.99f * std::max(std::min(temp[i].r, 1.0f), 0.0f));
+        intBuffer[i].g = uint8_t(255.99f * std::max(std::min(temp[i].g, 1.0f), 0.0f));
+        intBuffer[i].b = uint8_t(255.99f * std::max(std::min(temp[i].b, 1.0f), 0.0f));
+        intBuffer[i].a = uint8_t(255.99f * std::max(std::min(temp[i].a, 1.0f), 0.0f));
     }
     stbi_write_png(filename, this->width, this->height, NUM_CHANNELS, intBuffer, this->width * sizeof(uint8_t) * NUM_CHANNELS);
     delete(intBuffer);
@@ -334,6 +334,30 @@ void ImageF::threshold(float thresh)
             temp[i].g = 1.0f;
             temp[i].b = 1.0f;
             temp[i].a = 1.0f;
+        }
+        else
+        {
+            temp[i].r = 0.0f;
+            temp[i].g = 0.0f;
+            temp[i].b = 0.0f;
+            temp[i].a = 0.0f;
+        }
+    }
+}
+
+void ImageF::thresholdColor(float thresh, float strength)
+{
+    if (null())
+        return;
+    for (int i = 0; i < pixelCount; i++)
+    {
+        float avg = (pixels[i].r + pixels[i].g + pixels[i].b) / 3.0f;
+        if (avg > thresh)
+        {
+            temp[i].r = pixels[i].r * strength;
+            temp[i].g = pixels[i].g * strength;
+            temp[i].b = pixels[i].b * strength;
+            temp[i].a = pixels[i].a * strength;
         }
         else
         {
@@ -475,9 +499,6 @@ void ImageF::gaussianBlur(int kernel)
     {
         return;
     }
-    std::cout << "Starting gaussian blur..." << std::endl;
-    ImageF intermediary;
-    intermediary.buffer(*this);
 
     if (kernel % 2 == 0)
     {
@@ -528,7 +549,6 @@ void ImageF::gaussianBlur(int kernel)
             }
         }
     }
-    std::cout << "Finished gaussian blur!" << std::endl;
 }
 
 void ImageF::blendForeground(const ImageF& fg)
@@ -572,7 +592,7 @@ void ImageF::bloom(float threshold, int kernel)
 {
     if (null())
         return;
-    ImageF foreground;
+    static ImageF foreground;
     foreground.buffer(*this);
     foreground.threshold(threshold);
     foreground.apply();

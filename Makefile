@@ -8,7 +8,7 @@ EXTERNAL_DIR = external
 # Flags, compiler stuff
 # Necessary project flags
 CFLAGS = -MMD -MP -I$(INCLUDES_DIR) -I$(EXTERNAL_DIR)
-CFLAGS += -std=c++20 -O0
+CFLAGS += -std=c++20 -O3 -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -march=native
 
 d ?= 0
 ifeq ($(d), 1)

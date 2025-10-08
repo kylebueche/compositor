@@ -73,6 +73,7 @@ class ImageF
         void scaleContrast(float lowerBound, float upperBound);
         void colorTint(float r, float g, float b, float a);
         void threshold(float a);
+        void thresholdColor(float a, float strength);
         void adjustHSV(float hueShift, float saturationScale, float valueScale);
         void rotateHue(float shift);
         void scaleSaturation(float scale);
