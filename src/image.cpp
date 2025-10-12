@@ -106,18 +106,11 @@ void ImagePipeline::buffer(const char *filename)
     if (data)
     {
         ensureBufferSize(newWidth, newHeight);
-
-        int dataIndex = 0;
-        float scalar = 1.0f / 255.0f;
+        pixel4i_t* intBuffer = (pixel4i_t*) data;
         for (int i = 0; i < pixelCount; i++)
         {
-            dataIndex = i * 4;
-            input[i].r = scalar * float(data[dataIndex]);
-            input[i].g = scalar * float(data[dataIndex + 1]);
-            input[i].b = scalar * float(data[dataIndex + 2]);
-            input[i].a = scalar * float(data[dataIndex + 3]);
+            input[i] = pixelItoF(intBuffer[i]);
             output[i] = input[i];
-            
         }
         stbi_image_free(data);
     }
@@ -133,10 +126,7 @@ void ImagePipeline::write(const char *filename)
     pixel4i_t *intBuffer = new pixel4i_t[pixelCount];
     for (int i = 0; i < pixelCount; i++)
     {
-        intBuffer[i].r = uint8_t(255.99f * std::max(std::min(output[i].r, 1.0f), 0.0f));
-        intBuffer[i].g = uint8_t(255.99f * std::max(std::min(output[i].g, 1.0f), 0.0f));
-        intBuffer[i].b = uint8_t(255.99f * std::max(std::min(output[i].b, 1.0f), 0.0f));
-        intBuffer[i].a = uint8_t(255.99f * std::max(std::min(output[i].a, 1.0f), 0.0f));
+        intBuffer[i] = pixelFtoI(output[i]);
     }
     stbi_write_png(filename, this->width, this->height, NUM_CHANNELS, intBuffer, this->width * sizeof(uint8_t) * NUM_CHANNELS);
     delete(intBuffer);

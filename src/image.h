@@ -1,8 +1,10 @@
-/********************************************
+/************************************************************************
  * Author: Kyle Bueche
  * File: image.h
  *
- *******************************************/
+ * Header with some inline functions for RGBA and HSVA operations.
+ * Pixel functions are used in a greater ImagePipeline class.
+************************************************************************/
 
 #ifndef IMAGE_H
 #define IMAGE_H
@@ -13,35 +15,41 @@
 
 const int NUM_CHANNELS = 4;
 
-typedef struct
+struct pixel4i_t
 {
     uint8_t r;
     uint8_t g;
     uint8_t b;
     uint8_t a;
-} pixel4i_t;
+};
 
 
-typedef struct
+struct pixel4f_t
 {
     float r;
     float g;
     float b;
     float a;
-} pixel4f_t;
+};
 
-typedef struct
+struct pixel4f_hsv_t
 {
     float h;
     float s;
     float v;
     float a;
-} pixel4f_hsv_t;
+};
+
+inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg)
+inline pixel4f_t operator*(const float scalar, const pixel4f_t& pixel)
+inline pixel4f_t operator*(const pixel4f_t& pixel1, const pixel4f_t& pixel2)
 
 inline int clamp(int value, int min, int max);
 inline int index(int x, int y, int width, int height);
 inline pixel4f_hsv_t pixelRGBAtoHSVA(const pixel4f_t& pixel);
 inline pixel4f_t pixelHSVAtoRGBA(const pixel4f_hsv_t& pixel);
+inline pixel4f_t pixelItoF(const pixel4i_t& pixel)
+inline pixel4i_t pixelFtoI(const pixel4f_t& pixel)
 
 class ImagePipeline
 {
@@ -83,11 +91,8 @@ public:
 };
 
 /************************************************************************
-* Author: Kyle Bueche
-* Branchless clamp
-*
+* Branchless clamp for ints and floats
 ************************************************************************/
-
 inline int clamp(int val, int min, int max)
 {
     const int t = (val < min) ? min : val;
@@ -101,13 +106,81 @@ inline float clamp(float val, float min, float max)
 }
 
 /************************************************************************
-* Author: Kyle Bueche
-* Nearest in-bounds index
-*
+* Nearest in-bounds 2D index, flattened into 1D
 ************************************************************************/
 inline int index(int x, int y, int width, int height)
 {
     return clamp(y, 0, height - 1) * width + clamp(x, 0, width - 1);
+}
+
+/************************************************************************
+* RGBA Blend adapted from Wikipedia
+* TODO: Clamp is in place as a branchless safeguard against division by 0.
+* May not be the expected result when compositing two images with fully transparent backgrounds?
+************************************************************************/
+inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg)
+{
+    float aOut = clamp(fg.a + bg.b * (1.0f - fg.a), 0.001f, 1.0f);
+    pixel4f_t pOut = (1.0f / aOut) * (fg.a * fg + bg.a * bg * (1.0f - fg.a));
+    pOut.a = aOut;
+    return pOut
+}
+
+/************************************************************************
+* RGBA scale, only scales RGB channels.
+************************************************************************/
+inline pixel4f_t operator*(const float scalar, const pixel4f_t& pixel)
+{
+    return {
+        scalar * pixel.r,
+        scalar * pixel.g,
+        scalar * pixel.b,
+        pixel.a
+    };
+}
+    
+inline pixel4f_t operator*(const pixel4f_t& pixel1, const pixel4f_t& pixel2)
+{
+    return {
+        pixel1.r * pixel2.r,
+        pixel1.g * pixel2.g,
+        pixel1.b * pixel2.b,
+        pixel1.a * pixel2.a,
+    };
+}
+/************************************************************************
+* Author: Kyle Bueche
+* PixelI to pixelF conversion
+*
+* Evenly maps a discrete range [0, 255] to the continuous range [0, 1]
+*
+************************************************************************/
+inline pixel4f_t pixelItoF(const pixel4i_t& pixel)
+{
+    return {
+        (1.0f / 255.0f) * float(pixel.r),
+        (1.0f / 255.0f) * float(pixel.g),
+        (1.0f / 255.0f) * float(pixel.b),
+        (1.0f / 255.0f) * float(pixel.a)
+    };
+}
+
+/************************************************************************
+* Author: Kyle Bueche
+* Pixelf to pixelI conversion
+*
+* Evenly buckets a continuous range [0, 1] into the discrete range [0, 255].
+* scaling by 255.99 rather than 255.0 provides a fair chance of truncating to 255.
+*
+************************************************************************/
+inline pixel4i_t pixelFtoI(const pixel4f_t& pixel)
+{
+    return {
+        uint8_t(255.99f * clamp(output[i].r, 0.0f, 1.0f)),
+        uint8_t(255.99f * clamp(output[i].g, 0.0f, 1.0f)),
+        uint8_t(255.99f * clamp(output[i].b, 0.0f, 1.0f)),
+        uint8_t(255.99f * clamp(output[i].a, 0.0f, 1.0f))
+    };
 }
 
 /************************************************************************
@@ -117,7 +190,7 @@ inline int index(int x, int y, int width, int height)
 * Algorithm adapted from rapidtables.com/convertor/rgb-to-hsv.html
 *
 ************************************************************************/
-pixel4f_hsv_t pixelRGBAtoHSVA(const pixel4f_t& pixel)
+inline pixel4f_hsv_t pixelRGBAtoHSVA(const pixel4f_t& pixel)
 {
     pixel4f_hsv_t pixelOut;
 
@@ -179,7 +252,7 @@ pixel4f_hsv_t pixelRGBAtoHSVA(const pixel4f_t& pixel)
 * Algorithm adapted from rapidtables.com/convertor/hsv-to-rgb.html
 *
 ************************************************************************/
-pixel4f_t pixelHSVAtoRGBA(const pixel4f_hsv_t& pixel)
+inline pixel4f_t pixelHSVAtoRGBA(const pixel4f_hsv_t& pixel)
 {
     pixel4f_t pixelOut;
     // Ensure 0 <= H < 360,
