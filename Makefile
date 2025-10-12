@@ -22,7 +22,7 @@ endif
 CFLAGS += -Wall -Wextra -pedantic
 # CFLAGS += -Werror
 
-LIBS = -lglfw3 -lgdi32 -lopengl32 -limm32
+LIBS = -lglfw3 -lgdi32 -lopengl32 -limm32 -lOpengl32
 
 # Obtain all source, object, and dependency files
 SRC = $(wildcard $(SRC_DIR)/*.cpp)

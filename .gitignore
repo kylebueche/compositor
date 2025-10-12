@@ -5,6 +5,8 @@ Main.exe
 *.o
 *.d
 
+*.ini
+
 *.jpg
 *.png
 *.hdr
