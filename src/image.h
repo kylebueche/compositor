@@ -12,6 +12,8 @@
 #include <cstring>
 #include <cstdint>
 #include <iostream>
+#include <cmath>
+#include <numbers>
 
 const int NUM_CHANNELS = 4;
 
@@ -22,7 +24,6 @@ struct pixel4i_t
     uint8_t b;
     uint8_t a;
 };
-
 
 struct pixel4f_t
 {
@@ -40,54 +41,109 @@ struct pixel4f_hsv_t
     float a;
 };
 
-inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg)
-inline pixel4f_t operator*(const float scalar, const pixel4f_t& pixel)
-inline pixel4f_t operator*(const pixel4f_t& pixel1, const pixel4f_t& pixel2)
+
+// Standard pixel operations
+inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg);
+inline pixel4f_t operator*(const float& scalar, const pixel4f_t& pixel);
+inline pixel4f_t operator*(const pixel4f_t& pixel, const float& scalar);
+inline pixel4f_t operator/(const pixel4f_t& pixel, const float& scalar);
+inline pixel4f_t operator*(const pixel4f_t& pixel1, const pixel4f_t& pixel2);
+inline pixel4f_t negate(const pixel4f_t& pixel1, const pixel4f_t& pixel2);
 
 inline int clamp(int value, int min, int max);
 inline int index(int x, int y, int width, int height);
 inline pixel4f_hsv_t pixelRGBAtoHSVA(const pixel4f_t& pixel);
 inline pixel4f_t pixelHSVAtoRGBA(const pixel4f_hsv_t& pixel);
-inline pixel4f_t pixelItoF(const pixel4i_t& pixel)
-inline pixel4i_t pixelFtoI(const pixel4f_t& pixel)
+inline pixel4f_t pixelItoF(const pixel4i_t& pixel);
+inline pixel4i_t pixelFtoI(const pixel4f_t& pixel);
 
-class ImagePipeline
+// Handles file I/O, dynamic sizing, single-image storing.
+class Image
 {
 public:
+    struct pixel4f_t* buffer;
     int width;
     int height;
     float aspectRatio;
-
-    int pixelCount;
-    int bufferSize;
-
-    pixel4f_t *input;
-    pixel4f_t *temp1;
-    pixel4f_t *temp2;
-    pixel4f_t *temp3;
-    pixel4f_t *output;
-
-    ImagePipeline(int width, int height);
-    ~ImagePipeline();
-    const bool null() const;
-    void ensureBuffersDeleted();
+    
+    int pixelCount; // Current image size
+    int bufferSize; // Underlying memory size
+    Image();
+    ~Image();
+    const bool null() const; // Check if buffer is nullptr
+    void ensureBufferDeleted();
     void ensureBufferSize(int width, int height);
-    void buffer(const char* filename); // Load image from file
+    void read(const char* filename); // Load image from file
+    void read(const Image& image); // Copy image from other image
     void write(const char* filename); // Write image to file
 
-    void toGreyscale(pixel4f_t weights);
-    void toNegative();
-    pixel4f_t max();
-    pixel4f_t min();
-    void scaleContrast(float contrast);
-    void colorTint(pixel4f_t tint);
-    void threshold(float threshold);
-    void thresholdColor(float threshold, float strength);
-    void adjustHSV(pixel4f_hsv_t hsv);
-    void gaussianBlur(int kernel);
-    void blendForeground(pixel4f_t* a, pixel4f_t* b);
-    void add(pixel4f_t* a, pixel4f_t* b);
-    void bloom(float threshold, int kernel);
+    // Make myImage(i) valid
+    inline pixel4f_t& operator[](size_t i) noexcept {
+        return buffer[i];
+    }
+    inline const pixel4f_t& operator[](size_t i) const noexcept {
+        return buffer[i];
+    }
+
+    // Make myImage(x, y) valid
+    inline pixel4f_t& operator()(size_t x, size_t y) noexcept {
+        return buffer[y * width + x];
+    }
+    inline const pixel4f_t& operator()(size_t x, size_t y) const noexcept {
+        return buffer[y * width + x];
+    }
+
+    // Nearest in-bounds 2D index, flattened into 1D
+    inline pixel4f_t& clamped(size_t x, size_t y) noexcept {
+        return buffer[clamp(y, 0, height - 1) * width + clamp(x, 0, width - 1)];
+    }
+    inline const pixel4f_t& clamped(size_t x, size_t y) const noexcept {
+        return buffer[clamp(y, 0, height - 1) * width + clamp(x, 0, width - 1)];
+    }
+};
+
+// Handles operations that require a memory pool.
+class ImagePipeline
+{
+public:
+    // Workspace
+    Image temp1;
+    Image temp2;
+    Image temp3;
+
+    // 1 Image input, non-Image output
+    pixel4f_t max(const Image& image);
+    pixel4f_t min(const Image& image);
+
+    // 1 Image input, 1 Image output
+    // Ensure output fits input size
+    void toNegative(const Image& in, Image& out);
+    void scaleContrast(const Image& in, Image& out, float contrast);
+    void scaleBrightness(const Image& in, Image& out, float brightness);
+    void scaleTransparency(const Image& in, Image& out, float transparency);
+    void toGreyscale(const Image& in, Image& out, pixel4f_t weights);
+    void colorTint(const Image& in, Image& out, pixel4f_t tint);
+    void threshold(const Image& in, Image& out, float threshold);
+    void thresholdColor(const Image& in, Image& out, float threshold);
+    void adjustHSV(const Image& in, Image& out, pixel4f_hsv_t hsv);
+    void gaussianBlur(const Image& in, Image& out, int kernel);
+    void gaussianDeBlur(const Image& in, Image& out, int kernel);
+    void bloom(const Image& in, Image& out, float threshold, int kernel, float strength);
+
+    // 2 Image input, 1 Image output
+    // Ensure output fits the larger width and larger height from each image
+    void blendForeground(const Image& fg, const Image& bg, Image& out);
+    void add(const Image& in1, const Image& in2, Image& out);
+
+    // Mask output
+    void maskify(const Image& imgIn, Image& maskOut);
+    void horizontalMask(Image& maskOut, float t, int feathering, int width, int height);
+    void verticalMask(Image& maskOut, float t, int feathering, int width, int height);
+    void circleMask(Image& maskOut, float t, int feathering, int width, int height);
+    
+    // 2 Image input, 1 Mask input, 1 Image output
+    // Not size checked for now
+    void composite(const Image& imgIn1, const Image& imgIn2, Image& imgOut, const Image& mask);
 };
 
 /************************************************************************
@@ -105,12 +161,14 @@ inline float clamp(float val, float min, float max)
     return (t > max) ? max : t;
 }
 
-/************************************************************************
-* Nearest in-bounds 2D index, flattened into 1D
-************************************************************************/
-inline int index(int x, int y, int width, int height)
+inline float mylerp(float t, float t0, float t1)
 {
-    return clamp(y, 0, height - 1) * width + clamp(x, 0, width - 1);
+    return clamp(t * (t1 - t0) + t0, 0.0f, 1.0f);
+}
+
+inline float mylerp(float t, int t0, int t1)
+{
+    return mylerp(t, float(t0), float(t1));
 }
 
 /************************************************************************
@@ -118,23 +176,80 @@ inline int index(int x, int y, int width, int height)
 * TODO: Clamp is in place as a branchless safeguard against division by 0.
 * May not be the expected result when compositing two images with fully transparent backgrounds?
 ************************************************************************/
-inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg)
+inline pixel4f_t blendOver(const pixel4f_t& fg, const pixel4f_t& bg)
 {
     float aOut = clamp(fg.a + bg.b * (1.0f - fg.a), 0.001f, 1.0f);
-    pixel4f_t pOut = (1.0f / aOut) * (fg.a * fg + bg.a * bg * (1.0f - fg.a));
+    pixel4f_t pOut = (fg * fg.a + bg * bg.a * (1.0f - fg.a)) / aOut;
     pOut.a = aOut;
-    return pOut
+    return pOut;
+}
+
+/************************************************************************
+* Pixel negative, not modifying alpha.
+* Explicit name chosen for clarity instead of using operator-().
+************************************************************************/
+inline pixel4f_t negative(const pixel4f_t& pixel)
+{
+    return {
+        1.0f - pixel.r,
+        1.0f - pixel.g,
+        1.0f - pixel.b,
+        pixel.a
+    };
+}
+
+/************************************************************************
+* Fast brightness estimation.
+* A more accurate version would convert to hsv and return v,
+* but that is kinda slow.
+************************************************************************/
+inline float brightness(const pixel4f_t& pixel)
+{
+    return (pixel.r + pixel.g + pixel.b) / 3.0f;
+}
+
+/************************************************************************
+* RGBA add, not modifying alpha. Prefer fg alpha.
+************************************************************************/
+inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg)
+{
+    return {
+        fg.r + bg.r,
+        fg.g + bg.g,
+        fg.b + bg.b,
+        fg.a
+    };
 }
 
 /************************************************************************
 * RGBA scale, only scales RGB channels.
 ************************************************************************/
-inline pixel4f_t operator*(const float scalar, const pixel4f_t& pixel)
+inline pixel4f_t operator*(const float& scalar, const pixel4f_t& pixel)
 {
     return {
         scalar * pixel.r,
         scalar * pixel.g,
         scalar * pixel.b,
+        pixel.a
+    };
+}
+
+inline pixel4f_t operator*(const pixel4f_t& pixel, const float& scalar)
+{
+    return {
+        scalar * pixel.r,
+        scalar * pixel.g,
+        scalar * pixel.b,
+        pixel.a
+    };
+}
+
+inline pixel4f_t operator/(const pixel4f_t& pixel, const float& scalar)
+{
+    return {
+        pixel.r / scalar,
+        pixel.g / scalar,
+        pixel.b / scalar,
         pixel.a
     };
 }
@@ -176,10 +291,10 @@ inline pixel4f_t pixelItoF(const pixel4i_t& pixel)
 inline pixel4i_t pixelFtoI(const pixel4f_t& pixel)
 {
     return {
-        uint8_t(255.99f * clamp(output[i].r, 0.0f, 1.0f)),
-        uint8_t(255.99f * clamp(output[i].g, 0.0f, 1.0f)),
-        uint8_t(255.99f * clamp(output[i].b, 0.0f, 1.0f)),
-        uint8_t(255.99f * clamp(output[i].a, 0.0f, 1.0f))
+        uint8_t(255.99f * clamp(pixel.r, 0.0f, 1.0f)),
+        uint8_t(255.99f * clamp(pixel.g, 0.0f, 1.0f)),
+        uint8_t(255.99f * clamp(pixel.b, 0.0f, 1.0f)),
+        uint8_t(255.99f * clamp(pixel.a, 0.0f, 1.0f))
     };
 }
 
