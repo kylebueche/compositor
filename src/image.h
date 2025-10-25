@@ -44,6 +44,7 @@ struct pixel4f_hsv_t
 
 // Standard pixel operations
 inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg);
+inline pixel4f_t operator-(const pixel4f_t& fg, const pixel4f_t& bg);
 inline pixel4f_t operator*(const float& scalar, const pixel4f_t& pixel);
 inline pixel4f_t operator*(const pixel4f_t& pixel, const float& scalar);
 inline pixel4f_t operator/(const pixel4f_t& pixel, const float& scalar);
@@ -134,6 +135,7 @@ public:
     // Ensure output fits the larger width and larger height from each image
     void blendForeground(const Image& fg, const Image& bg, Image& out);
     void add(const Image& in1, const Image& in2, Image& out);
+    void subtract(const Image& in1, const Image& in2, Image& out);
 
     // Mask output
     void maskify(const Image& imgIn, Image& maskOut);
@@ -217,6 +219,16 @@ inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg)
         fg.r + bg.r,
         fg.g + bg.g,
         fg.b + bg.b,
+        fg.a
+    };
+}
+
+inline pixel4f_t operator-(const pixel4f_t& fg, const pixel4f_t& bg)
+{
+    return {
+        fg.r - bg.r,
+        fg.g - bg.g,
+        fg.b - bg.b,
         fg.a
     };
 }

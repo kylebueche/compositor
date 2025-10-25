@@ -387,9 +387,9 @@ void ImagePipeline::gaussianDeBlur(const Image& input, Image& output, int kernel
         }
         std::cout << std::endl;
     }
-    for (int x = 0; x < 20; x++)
+    for (int x = 0; x < 50; x++)
     {
-        for (int y = 0; y < 10; y++)
+        for (int y = 0; y < 25; y++)
         {
             std::cout << std::fixed << std::setprecision(3) << rowMatInverse(y, x) << " , ";
         }
@@ -512,6 +512,23 @@ void ImagePipeline::blendForeground(const Image& fg, const Image& bg, Image& out
 */
 }
 
+void ImagePipeline::subtract(const Image& fg, const Image& bg, Image& output)
+{
+    int overlapWidth = std::min(fg.width, bg.width);
+    int overlapHeight = std::min(fg.height, bg.height);
+    int outerWidth = std::max(fg.width, bg.width);
+    int outerHeight = std::max(fg.height, bg.height);
+    output.ensureBufferSize(outerWidth, outerHeight);
+    
+    // Overlap areas
+    for (int x = 0; x < overlapWidth; x++)
+    {
+        for (int y = 0; y < overlapHeight; y++)
+        {
+            output(x, y) = fg(x, y) - bg(x, y);
+        }
+    }
+}
 // TODO: Fix alpha?
 void ImagePipeline::add(const Image& fg, const Image& bg, Image& output)
 {

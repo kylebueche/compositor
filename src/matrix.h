@@ -46,11 +46,11 @@ class SquareMatrix
         inline float& operator()(size_t rowIndex, size_t colIndex) { return mat[rowIndex * side + colIndex]; } // Returns the row array pointer, so myMatrix[i][j] is valid.
         inline const float& operator()(size_t rowIndex, size_t colIndex) const { return mat[rowIndex * side + colIndex]; } // Same as above but read-only.
 
-        void scaleRow(int row, float divideBy)
+        void scaleRow(int row, float scalar)
         {
             for (int j = 0; j < side; j++)
             {
-                (*this)(row, j) = (*this)(row, j) / divideBy;
+                (*this)(row, j) = (*this)(row, j) * scalar;
             }
         }
 
@@ -91,7 +91,7 @@ class SquareMatrix
                     if (std::fabs(original(row, col)) > pivotValue)
                     {
                         pivotRow = row;
-                        pivotValue = std::fabs(original(row, col));
+                        pivotValue = original(row, col);
                     }
                 }
                 if (pivotRow == -1)
@@ -109,14 +109,17 @@ class SquareMatrix
                     original.swapRows(pivotRow, col);
                     inverse.swapRows(pivotRow, col);
                 }
-                original.scaleRow(col, original(col, col));
-                inverse.scaleRow(col, original(col, col));
+                
+                float val = 1.0f / original(col, col);
+                original.scaleRow(col, val);
+                inverse.scaleRow(col, val);
                 for (int row = 0; row < inverse.side; row++)
                 {
-                    if (row != col && std::fabs(original(row, col)) != 0.0f)
+                    if (row != col && std::fabs(original(row, col)) > 1e-8)
                     {
-                        original.addScaledRowToRow(col, row, -original(row, col));
-                        inverse.addScaledRowToRow(col, row, -original(row, col));
+                        float val2 = -original(row, col);
+                        original.addScaledRowToRow(col, row, val2);
+                        inverse.addScaledRowToRow(col, row, val2);
                     }
                 }
             }

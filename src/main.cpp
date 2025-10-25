@@ -5,6 +5,24 @@
 
 int main()
 {
+    ImagePipeline imgPipeline;
+    Image img;
+    Image imgblurred;
+    Image imgout;
+    Image thresh;
+    img.read("input/sunset.jpg");
+    imgPipeline.gaussianBlur(img, imgblurred, 9);
+    imgPipeline.gaussianDeBlur(imgblurred, imgout, 9);
+    imgblurred.write("sunsetblurred.jpg");
+    imgout.write("sunsetdeblurred.jpg");
+    imgPipeline.subtract(img, imgout, thresh);
+    thresh.write("sub.jpg");
+    pixel4f_t a = imgPipeline.min(thresh);
+    std::cout << "r: " << a.r << ", g: " << a.g << ", b: " << a.b << ", a: " << a.a << std::endl;
+    imgPipeline.scaleBrightness(thresh, thresh, 10.0f);
+    thresh.write("thresh.jpg");
+
+    /*
     int vidFrames = 120;
     ImagePipeline imgPipeline;
     Image imgIn1;
@@ -95,6 +113,6 @@ int main()
     std::cout << "Total Time Taken: " << totalDuration << std::endl;
     std::cout << "Total Time Spent Doing Necessary Operations: " << timeSpentNotPrinting << std::endl;
     std::cout << "Total Time Spent Printing to Terminal: " << timeSpentPrinting << std::endl;
-
+*/
     return 0;
 }
