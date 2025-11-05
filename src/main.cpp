@@ -1,4 +1,5 @@
 #include "image.h"
+#include "viewport.h"
 #include <string>
 #include <iostream>
 #include <chrono>
@@ -11,6 +12,18 @@ int main()
     Image imgout;
     Image thresh;
     img.read("input/sunset.jpg");
+    Viewport viewport(img.width, img.height);
+    vec2 scale;
+    float rotation;
+    vec2 translation;
+    scale.x = 0.5f;
+    scale.y = 0.5f;
+    rotation = 160.0f;
+    translation.x = 0.0f;
+    translation.y = 0.0f;
+    viewport.drawImage(img, scale, rotation, translation);
+    viewport.viewport.write("scaledSunset.jpg");
+    /*
     imgPipeline.gaussianBlur(img, imgblurred, 9);
     imgPipeline.gaussianDeBlur(imgblurred, imgout, 9);
     imgblurred.write("sunsetblurred.jpg");
@@ -21,6 +34,7 @@ int main()
     std::cout << "r: " << a.r << ", g: " << a.g << ", b: " << a.b << ", a: " << a.a << std::endl;
     imgPipeline.scaleBrightness(thresh, thresh, 10.0f);
     thresh.write("thresh.jpg");
+    */
 
     /*
     int vidFrames = 120;

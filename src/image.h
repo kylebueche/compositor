@@ -41,6 +41,28 @@ struct pixel4f_hsv_t
     float a;
 };
 
+struct vec2
+{
+    float x;
+    float y;
+};
+
+struct vec2_quad_t
+{
+    vec2 topLeft;
+    vec2 topRight;
+    vec2 bottomLeft;
+    vec2 bottomRight;
+};
+
+struct rgba_quad_t
+{
+    pixel4f_t topLeft;
+    pixel4f_t topRight;
+    pixel4f_t bottomLeft;
+    pixel4f_t bottomRight;
+};
+
 
 // Standard pixel operations
 inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg);
@@ -78,7 +100,7 @@ public:
     void read(const Image& image); // Copy image from other image
     void write(const char* filename); // Write image to file
 
-    // Make myImage(i) valid
+    // Make myImage(i) valid:
     inline pixel4f_t& operator[](size_t i) noexcept {
         return buffer[i];
     }
@@ -171,6 +193,35 @@ inline float mylerp(float t, float t0, float t1)
 inline float mylerp(float t, int t0, int t1)
 {
     return mylerp(t, float(t0), float(t1));
+}
+
+inline vec2 mylerp(float t, vec2 t0, vec2 t1)
+{
+    return { mylerp(t, t0.x, t1.x), mylerp(t, t0.y, t1.y) };
+}
+
+inline pixel4f_t mylerp(float t, pixel4f_t t0, pixel4f_t t1)
+{
+    return { mylerp(t, t0.r, t1.r),
+             mylerp(t, t0.g, t1.g),
+             mylerp(t, t0.b, t1.b),
+             mylerp(t, t0.a, t1.a) };
+}
+
+inline float cubic_interpolation(float t, float t0, float t1)
+{
+    return 1.0f;
+}
+    
+inline pixel4f_t bilinear_interpolation(vec2 point, vec2 topLeft, rgba_quad_t rgbaQuad)
+{
+    float t_x = point.x - topLeft.x;
+    float t_y = point.y - topLeft.y;
+
+    pixel4f_t topColor = mylerp(t_x, rgbaQuad.topLeft, rgbaQuad.topRight);
+    pixel4f_t bottomColor = mylerp(t_x, rgbaQuad.bottomLeft, rgbaQuad.bottomRight);
+    pixel4f_t color = mylerp(t_y, bottomColor, topColor);
+    return color;
 }
 
 /************************************************************************
