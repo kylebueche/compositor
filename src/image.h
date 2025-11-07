@@ -63,6 +63,35 @@ struct rgba_quad_t
     pixel4f_t bottomRight;
 };
 
+inline vec2 operator*(const float& scalar, const vec2& u)
+{
+    return { scalar * u.x, scalar * u.y };
+}
+inline vec2 operator*(const vec2& u, const float& scalar)
+{
+    return scalar * u;
+}
+inline vec2 operator+(const vec2& u, const vec2& v)
+{
+    return { u.x + v.x, u.y + v.y };
+}
+inline vec2 operator-(const vec2& u, const vec2& v)
+{
+    return { u.x - v.x, u.y - v.y };
+}
+inline float dot(const vec2& u, const vec2& v)
+{
+    return u.x * v.x + u.y * v.y;
+}
+inline float length(const vec2& u)
+{
+    return sqrt(dot(u, u));
+}
+inline vec2 normalized(const vec2& u)
+{
+    return (1.0f / length(u)) * u;
+}
+
 
 // Standard pixel operations
 inline pixel4f_t operator+(const pixel4f_t& fg, const pixel4f_t& bg);
@@ -187,7 +216,7 @@ inline float clamp(float val, float min, float max)
 
 inline float mylerp(float t, float t0, float t1)
 {
-    return clamp(t * (t1 - t0) + t0, 0.0f, 1.0f);
+    return clamp(t * (t1 - t0) + t0, std::min(t0, t1), std::max(t0, t1));
 }
 
 inline float mylerp(float t, int t0, int t1)
@@ -197,7 +226,8 @@ inline float mylerp(float t, int t0, int t1)
 
 inline vec2 mylerp(float t, vec2 t0, vec2 t1)
 {
-    return { mylerp(t, t0.x, t1.x), mylerp(t, t0.y, t1.y) };
+    return { mylerp(t, t0.x, t1.x),
+             mylerp(t, t0.y, t1.y) };
 }
 
 inline pixel4f_t mylerp(float t, pixel4f_t t0, pixel4f_t t1)
@@ -210,17 +240,33 @@ inline pixel4f_t mylerp(float t, pixel4f_t t0, pixel4f_t t1)
 
 inline float cubic_interpolation(float t, float t0, float t1)
 {
-    return 1.0f;
+    // -2x^3 + 3x^2 is a cubic function from 0, 0 to 1, 1, with slope 0 at each point.
+    return mylerp(-2 * t * t * t + 3 * t * t, t0, t1);
+}
+
+inline pixel4f_t cubic_interpolation(float t, pixel4f_t t0, pixel4f_t t1)
+{
+    // -2x^3 + 3x^2 is a cubic function from 0, 0 to 1, 1, with slope 0 at each point.
+    return { cubic_interpolation(t, t0.r, t1.r),
+             cubic_interpolation(t, t0.g, t1.g),
+             cubic_interpolation(t, t0.b, t1.b),
+             cubic_interpolation(t, t0.a, t1.a) };
 }
     
-inline pixel4f_t bilinear_interpolation(vec2 point, vec2 topLeft, rgba_quad_t rgbaQuad)
+inline pixel4f_t bilinear_interpolation(float tx, float ty, rgba_quad_t rgbaQuad)
 {
-    float t_x = point.x - topLeft.x;
-    float t_y = point.y - topLeft.y;
+    pixel4f_t topColor = mylerp(tx, rgbaQuad.topLeft, rgbaQuad.topRight);
+    pixel4f_t bottomColor = mylerp(tx, rgbaQuad.bottomLeft, rgbaQuad.bottomRight);
+    pixel4f_t color = mylerp(ty, topColor, bottomColor);
+    return color;
+}
 
-    pixel4f_t topColor = mylerp(t_x, rgbaQuad.topLeft, rgbaQuad.topRight);
-    pixel4f_t bottomColor = mylerp(t_x, rgbaQuad.bottomLeft, rgbaQuad.bottomRight);
-    pixel4f_t color = mylerp(t_y, bottomColor, topColor);
+// This is NOT bicubic interpolation, it apparently needs a 4x4 grid of 16 pixels. This is a smoother-weighted bilinear interpolation.
+inline pixel4f_t bicubic_interpolation(float tx, float ty, rgba_quad_t rgbaQuad)
+{
+    pixel4f_t topColor = cubic_interpolation(tx, rgbaQuad.topLeft, rgbaQuad.topRight);
+    pixel4f_t bottomColor = cubic_interpolation(tx, rgbaQuad.bottomLeft, rgbaQuad.bottomRight);
+    pixel4f_t color = cubic_interpolation(ty, topColor, bottomColor);
     return color;
 }
 
