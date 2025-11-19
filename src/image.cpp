@@ -18,65 +18,27 @@
 
 Image::Image()
 {
-    this->buffer = nullptr;
     this->width = 0;
     this->height = 0;
     this->aspectRatio = 1.0f;
     this->pixelCount = 0;
-    this->bufferSize = 0;
 }
 
-Image::~Image()
+Image::Image(int width, int height)
 {
-    ensureBufferDeleted();
+    this->resize(width, height);
 }
 
-void Image::ensureBufferDeleted()
-{
-    if (this->buffer != nullptr)
-        delete[] this->buffer;
-    this->buffer = nullptr;
-    this->width = 0;
-    this->height = 0;
-    this->aspectRatio = 1.0f;
-    this->pixelCount = 0;
-    this->bufferSize = 0;
-}
-
-void Image::ensureBufferSize(int width, int height)
+void Image::resize(int width, int height)
 {
     if (width >= 0 && height >= 0)
     {
-        int newPixelCount = width * height;
-        // Reallocate buffer if not big enough
-        if (newPixelCount > this->bufferSize)
-        {
-            ensureBufferDeleted();
-            this->buffer = new pixel4f_t[newPixelCount];
-            // Handle allocation failure
-if (this->buffer == nullptr)
-            {
-                std::cerr << "Error: buffer allocation failed in buffer " << this << std::endl;
-                return;
-            }
-            this->bufferSize = newPixelCount;
-        }
-
         this->width = width;
         this->height = height;
-        this->pixelCount = newPixelCount;
         this->aspectRatio = float(width) / float(height);
+        this->pixelCount = width * height;
+        buffer.resize(width * height);
     }
-}
-
-const bool Image::null() const
-{
-    bool bufferNull = (buffer == nullptr);
-    if (bufferNull)
-    {
-        std::cerr << "Image buffer loading failed." << std::endl;
-    }
-    return bufferNull;
 }
 
 // From file bufferer
@@ -92,7 +54,7 @@ void Image::read(const char *filename)
     // Handle stbi loading errors
     if (data)
     {
-        ensureBufferSize(newWidth, newHeight);
+        resize(newWidth, newHeight);
         pixel4i_t* intBuffer = (pixel4i_t*) data;
         for (int i = 0; i < pixelCount; i++)
         {
@@ -108,7 +70,7 @@ void Image::read(const char *filename)
 
 void Image::read(const Image& image)
 {
-    ensureBufferSize(image.width, image.height);
+    resize(image.width, image.height);
     for (int i = 0; i < image.pixelCount; i++)
     {
         buffer[i] = image[i];
@@ -132,6 +94,54 @@ void Image::write(const char *filename)
     {
         std::cerr << "ERROR: Intbuffer allocation failed while writing to file." << std::endl;
     }
+}
+
+col4f_t Image::nearestNeighbor(float tx, float ty)
+{
+    rgba_quad_t quad;
+    int x = int(tx);
+    int y = int(ty);
+    float pixeltx = tx - float(x);
+    float pixelty = ty - float(y);
+    
+    quad.topLeft = clamped(x, y);
+    quad.topRight = clamped(x + 1, y);
+    quad.bottomLeft = clamped(x, y + 1);
+    quad.bottomRight = clamped(x + 1, y + 1);
+    
+    return nearestNeighbor(pixeltx, pixelty, quad);
+}
+            
+col4f_t Image::bilinearInterpolation(float tx, float ty)
+{
+    rgba_quad_t quad;
+    int x = int(tx);
+    int y = int(ty);
+    float pixeltx = tx - float(x);
+    float pixelty = ty - float(y);
+    
+    quad.topLeft = clamped(x, y);
+    quad.topRight = clamped(x + 1, y);
+    quad.bottomLeft = clamped(x, y + 1);
+    quad.bottomRight = clamped(x + 1, y + 1);
+    
+    return bilinearInterpolation(pixeltx, pixelty, quad);
+}
+
+col4f_t Image::bicubicInterpolation(float tx, float ty)
+{
+    rgba_quad_t quad;
+    int x = int(tx);
+    int y = int(ty);
+    float pixeltx = tx - float(x);
+    float pixelty = ty - float(y);
+    
+    quad.topLeft = clamped(x, y);
+    quad.topRight = clamped(x + 1, y);
+    quad.bottomLeft = clamped(x, y + 1);
+    quad.bottomRight = clamped(x + 1, y + 1);
+    
+    return bicubicInterpolation(pixeltx, pixelty, quad);
 }
 
 // Consider making these Image:: member functions
@@ -179,7 +189,7 @@ pixel4f_t ImagePipeline::min(const Image& image)
 
 void ImagePipeline::toNegative(const Image& input, Image& output)
 {
-    output.ensureBufferSize(input.width, input.height);
+    output.resize(input.width, input.height);
     for (int i = 0; i < input.pixelCount; i++)
     {
         output[i] = negative(input[i]);
@@ -189,7 +199,7 @@ void ImagePipeline::toNegative(const Image& input, Image& output)
 
 void ImagePipeline::scaleContrast(const Image& input, Image& output, float contrast)
 {
-    output.ensureBufferSize(input.width, input.height);
+    output.resize(input.width, input.height);
     float higherBound = contrast;
     float lowerBound = 1.0f / contrast;
     float deltaOut = higherBound - lowerBound;
@@ -210,7 +220,7 @@ void ImagePipeline::scaleContrast(const Image& input, Image& output, float contr
 
 void ImagePipeline::scaleBrightness(const Image& input, Image& output, float scale)
 {
-    output.ensureBufferSize(input.width, input.height);
+    output.resize(input.width, input.height);
     for (int i = 0; i < input.pixelCount; i++)
     {
         output[i] = scale * input[i];
@@ -219,7 +229,7 @@ void ImagePipeline::scaleBrightness(const Image& input, Image& output, float sca
 
 void ImagePipeline::toGreyscale(const Image& input, Image& output, pixel4f_t weights)
 {
-    output.ensureBufferSize(input.width, input.height);
+    output.resize(input.width, input.height);
     float avg;
     for (int i = 0; i < input.pixelCount; i++)
     {
@@ -230,7 +240,7 @@ void ImagePipeline::toGreyscale(const Image& input, Image& output, pixel4f_t wei
 
 void ImagePipeline::threshold(const Image& input, Image& output, float threshold)
 {
-    output.ensureBufferSize(input.width, input.height);
+    output.resize(input.width, input.height);
     for (int i = 0; i < input.pixelCount; i++)
     {
         float avg = (input[i].r + input[i].g + input[i].b) / 3.0f;
@@ -247,7 +257,7 @@ void ImagePipeline::threshold(const Image& input, Image& output, float threshold
 
 void ImagePipeline::thresholdColor(const Image& input, Image& output, float thresh)
 {
-    output.ensureBufferSize(input.width, input.height);
+    output.resize(input.width, input.height);
     for (int i = 0; i < input.pixelCount; i++)
     {
         float avg = (input[i].r + input[i].g + input[i].b) / 3.0f;
@@ -264,7 +274,7 @@ void ImagePipeline::thresholdColor(const Image& input, Image& output, float thre
 
 void ImagePipeline::colorTint(const Image& input, Image& output, pixel4f_t tint)
 {
-    output.ensureBufferSize(input.width, input.height);
+    output.resize(input.width, input.height);
     for (int i = 0; i < input.pixelCount; i++)
     {
         output[i] = blendOver(tint, input[i]);
@@ -273,7 +283,7 @@ void ImagePipeline::colorTint(const Image& input, Image& output, pixel4f_t tint)
 
 void ImagePipeline::adjustHSV(const Image& input, Image& output, pixel4f_hsv_t hsv)
 {
-    output.ensureBufferSize(input.width, input.height);
+    output.resize(input.width, input.height);
     for (int i = 0; i < input.pixelCount; i++)
     {
         pixel4f_hsv_t pixel = pixelRGBAtoHSVA(input[i]);
@@ -286,8 +296,8 @@ void ImagePipeline::adjustHSV(const Image& input, Image& output, pixel4f_hsv_t h
 
 void ImagePipeline::gaussianBlur(const Image& input, Image& output, int kernel)
 {
-    temp1.ensureBufferSize(input.width, input.height);
-    output.ensureBufferSize(input.width, input.height);
+    temp1.resize(input.width, input.height);
+    output.resize(input.width, input.height);
     if (kernel % 2 == 0)
     {
         kernel++;
@@ -331,8 +341,8 @@ void ImagePipeline::gaussianBlur(const Image& input, Image& output, int kernel)
 
 void ImagePipeline::gaussianDeBlur(const Image& input, Image& output, int kernel)
 {
-    temp1.ensureBufferSize(input.width, input.height);
-    output.ensureBufferSize(input.width, input.height);
+    temp1.resize(input.width, input.height);
+    output.resize(input.width, input.height);
     if (kernel % 2 == 0)
     {
         kernel++;
@@ -446,7 +456,7 @@ void ImagePipeline::blendForeground(const Image& fg, const Image& bg, Image& out
     int overlapHeight = std::min(fg.height, bg.height);
     int outerWidth = std::max(fg.width, bg.width);
     int outerHeight = std::max(fg.height, bg.height);
-    output.ensureBufferSize(outerWidth, outerHeight);
+    output.resize(outerWidth, outerHeight);
     
     // Overlap areas
     for (int x = 0; x < overlapWidth; x++)
@@ -518,7 +528,7 @@ void ImagePipeline::subtract(const Image& fg, const Image& bg, Image& output)
     int overlapHeight = std::min(fg.height, bg.height);
     int outerWidth = std::max(fg.width, bg.width);
     int outerHeight = std::max(fg.height, bg.height);
-    output.ensureBufferSize(outerWidth, outerHeight);
+    output.resize(outerWidth, outerHeight);
     
     // Overlap areas
     for (int x = 0; x < overlapWidth; x++)
@@ -536,7 +546,7 @@ void ImagePipeline::add(const Image& fg, const Image& bg, Image& output)
     int overlapHeight = std::min(fg.height, bg.height);
     int outerWidth = std::max(fg.width, bg.width);
     int outerHeight = std::max(fg.height, bg.height);
-    output.ensureBufferSize(outerWidth, outerHeight);
+    output.resize(outerWidth, outerHeight);
     
     // Overlap areas
     for (int x = 0; x < overlapWidth; x++)
@@ -604,7 +614,7 @@ void ImagePipeline::add(const Image& fg, const Image& bg, Image& output)
 
 void ImagePipeline::maskify(const Image& imgIn, Image& maskOut)
 {
-    maskOut.ensureBufferSize(imgIn.width, imgIn.height);
+    maskOut.resize(imgIn.width, imgIn.height);
     for (int i = 0; i < imgIn.pixelCount; i++)
     {
         maskOut[i] = { 0.0f, 0.0f, 0.0f, brightness(imgIn[i]) };
@@ -613,7 +623,7 @@ void ImagePipeline::maskify(const Image& imgIn, Image& maskOut)
 
 void ImagePipeline::horizontalMask(Image& maskOut, float t, int feathering, int width, int height)
 {
-    maskOut.ensureBufferSize(width, height);
+    maskOut.resize(width, height);
     int cutoff = clamp(int(float(width) * t), 0, width);
     for (int x = 0; x < width; x++)
     {
@@ -626,7 +636,7 @@ void ImagePipeline::horizontalMask(Image& maskOut, float t, int feathering, int 
 
 void ImagePipeline::verticalMask(Image& maskOut, float t, int feathering, int width, int height)
 {
-    maskOut.ensureBufferSize(width, height);
+    maskOut.resize(width, height);
     int cutoff = clamp(int(float(height) * t), 0, height);
     for (int x = 0; x < width; x++)
     {
@@ -639,7 +649,7 @@ void ImagePipeline::verticalMask(Image& maskOut, float t, int feathering, int wi
 
 void ImagePipeline::circleMask(Image& maskOut, float t, int feathering, int width, int height)
 {
-    maskOut.ensureBufferSize(width, height);
+    maskOut.resize(width, height);
     int centerX = width / 2;
     int centerY = height / 2;
     float finalRadius = sqrt(width * width + height * height) / 2.0f;
@@ -665,7 +675,7 @@ void ImagePipeline::circleMask(Image& maskOut, float t, int feathering, int widt
 
 void ImagePipeline::composite(const Image& imgIn1, const Image& imgIn2, Image& imgOut, const Image& mask)
 {
-    imgOut.ensureBufferSize(imgIn1.width, imgIn1.height);
+    imgOut.resize(imgIn1.width, imgIn1.height);
     for (int i = 0; i < imgIn1.pixelCount; i++)
     {
         imgOut[i] = imgIn1[i] * mask[i].a + imgIn2[i] * (1.0f - mask[i].a);

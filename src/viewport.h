@@ -10,13 +10,15 @@ class Viewport
 {
 public:
     std::vector<vec2> pixelCoords;
+    int width;
+    int height;
     Image viewport;
     
     std::vector<vec2> temp;
 
-    Viewport(int width, int height)
-    {
-        viewport.ensureBufferSize(width, height);
+    Viewport(int width, int height) : width(width), height(height)
+    {:
+        viewport.resize(width, height);
         pixelCoords.resize(width * height);
         for (int x = 0; x < width; x++)
         {
