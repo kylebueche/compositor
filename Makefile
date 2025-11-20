@@ -19,7 +19,8 @@ endif
 # CFLAGS += -mwindows
 
 # Extra warnings
-CFLAGS += -Wall -Wextra -pedantic
+CFLAGS += -Wall
+#-Wextra -pedantic
 # CFLAGS += -Werror
 
 LIBS = -lglfw3 -lgdi32 -lopengl32 -limm32 -lOpengl32

@@ -12,6 +12,47 @@
 #include <cmath>
 #include <numbers>
 
+
+struct vec2
+{
+    float x;
+    float y;
+};
+
+inline vec2 operator+(const vec2& a, const vec2& b) { return { a.x + b.x, a.y + b.y }; }
+inline vec2 operator-(const vec2& a, const vec2& b) { return { a.x - b.x, a.y - b.y }; }
+inline vec2 operator*(const float& a, const vec2& b) { return { a * b.x, a * b.y }; }
+inline vec2 operator*(const vec2& a, const float& b) { return { a.x * b, a.y * b }; }
+inline float dot(const vec2& a, const vec2& b) { return a.x * b.x + a.y * b.y; };
+inline float length2(const vec2& a) { return dot(a, a); };
+inline float length(const vec2& a) { return sqrt(length2(a)); };
+inline float distance(const vec2& a, const vec2& b) { return length(a - b); };
+inline vec2 normalized(const vec2& a) { return (1.0f / length(a)) * a; };
+
+inline vec2 vecScale(const vec2& scale, const vec2& a)
+{
+    return { scale.x * a.x, scale.y * a.y };
+}
+
+/* Potential optimization:
+ * Possibly cache sin_theta and cos_theta for long streams of this operation
+ */
+inline vec2 vecRotate(const float& radians, const vec2& a)
+{
+    float sin_theta = sin(radians);
+    float cos_theta = cos(radians);
+    return {
+        cos_theta * a.x - sin_theta * a.y,
+        sin_theta * a.x + cos_theta * a.y
+    };
+}
+
+inline vec2 vecTranslate(const vec2& translation, const vec2& a)
+{
+    return { translation.x + a.x, translation.y + a.y };
+}
+
+
 /************************************************************************
 * Branchless clamp for ints and floats
 ************************************************************************/
@@ -27,25 +68,25 @@ inline float clamp(float val, float min, float max)
     return (t > max) ? max : t;
 }
 
-inline float lerp(float t, float t0, float t1)
+inline float linear_interpolation(float t, float t0, float t1)
 {
     return t * (t1 - t0) + t0;
 }
 
-inline float lerp(float t, int t0, int t1)
+inline float linear_interpolation(float t, int t0, int t1)
 {
-    return lerp(t, float(t0), float(t1));
+    return linear_interpolation(t, float(t0), float(t1));
 }
 
 inline float clerp(float t, float t0, float t1)
 {
-    return clamp(lerp(t, t0, t1), std::min(t0, t1), std::max(t0, t1));
+    return clamp(linear_interpolation(t, t0, t1), std::min(t0, t1), std::max(t0, t1));
 }
 
-inline vec2 lerp(float t, vec2 t0, vec2 t1)
+inline vec2 linear_interpolation(float t, vec2 t0, vec2 t1)
 {
-    return { lerp(t, t0.x, t1.x),
-             lerp(t, t0.y, t1.y) };
+    return { linear_interpolation(t, t0.x, t1.x),
+             linear_interpolation(t, t0.y, t1.y) };
 }
 
 /*********************************************************************************
@@ -105,14 +146,6 @@ inline float cubic_interpolation(float t, float tneg1, float t0, float t1, float
     return answer;
 }
 
-inline col4f_t cubic_interpolation(float t, col4f_t tneg1, col4f_t t0, col4f_t t1, col4f_t t2)
-{
-    // -2x^3 + 3x^2 is a cubic function from 0, 0 to 1, 1, with slope 0 at each point.
-    return { cubic_interpolation(t, tneg1.r, t0.r, t1.r, t2.r),
-             cubic_interpolation(t, tneg1.g, t0.g, t1.g, t2.g),
-             cubic_interpolation(t, tneg1.b, t0.b, t1.b, t2.b),
-             cubic_interpolation(t, tneg1.a, t0.a, t1.a, t3.a) };
-}
 
 
 #endif

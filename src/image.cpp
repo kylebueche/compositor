@@ -8,13 +8,15 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image.h>
 #include <stb_image_write.h>
-#include <cmath>
 #include <numbers>
 #include <vector>
 #include <new>
 #include <iomanip>
 #include "image.h"
 #include "matrix.h"
+#include "math.h"
+#include "perlin-noise.h"
+#include <cmath>
 
 Image::Image()
 {
@@ -55,10 +57,10 @@ void Image::read(const char *filename)
     if (data)
     {
         resize(newWidth, newHeight);
-        pixel4i_t* intBuffer = (pixel4i_t*) data;
+        col4i* intBuffer = (col4i*) data;
         for (int i = 0; i < pixelCount; i++)
         {
-            buffer[i] = pixelItoF(intBuffer[i]);
+            buffer[i] = colItoF(intBuffer[i]);
         }
         stbi_image_free(data);
     }
@@ -80,12 +82,12 @@ void Image::read(const Image& image)
 // TODO: Handle intBuffer allocation failure
 void Image::write(const char *filename)
 {
-    pixel4i_t *intBuffer = new pixel4i_t[pixelCount];
+    col4i *intBuffer = new col4i[pixelCount];
     if (intBuffer != nullptr)
     {
         for (int i = 0; i < pixelCount; i++)
         {
-            intBuffer[i] = pixelFtoI(buffer[i]);
+            intBuffer[i] = colFtoI(buffer[i]);
         }
         stbi_write_png(filename, this->width, this->height, NUM_CHANNELS, intBuffer, this->width * sizeof(uint8_t) * NUM_CHANNELS);
         delete[] intBuffer;
@@ -96,7 +98,7 @@ void Image::write(const char *filename)
     }
 }
 
-col4f_t Image::nearestNeighbor(float tx, float ty)
+col4f Image::nearestNeighbor(float tx, float ty)
 {
     rgba_quad_t quad;
     int x = int(tx);
@@ -109,10 +111,10 @@ col4f_t Image::nearestNeighbor(float tx, float ty)
     quad.bottomLeft = clamped(x, y + 1);
     quad.bottomRight = clamped(x + 1, y + 1);
     
-    return nearestNeighbor(pixeltx, pixelty, quad);
+    return nearest_neighbor(pixeltx, pixelty, quad);
 }
             
-col4f_t Image::bilinearInterpolation(float tx, float ty)
+col4f Image::bilinearInterpolation(float tx, float ty)
 {
     rgba_quad_t quad;
     int x = int(tx);
@@ -125,30 +127,45 @@ col4f_t Image::bilinearInterpolation(float tx, float ty)
     quad.bottomLeft = clamped(x, y + 1);
     quad.bottomRight = clamped(x + 1, y + 1);
     
-    return bilinearInterpolation(pixeltx, pixelty, quad);
+    return bilinear_interpolation(pixeltx, pixelty, quad);
 }
 
-col4f_t Image::bicubicInterpolation(float tx, float ty)
+col4f Image::bicubicInterpolation(float tx, float ty)
 {
-    rgba_quad_t quad;
+    rgba_grid_t grid;
     int x = int(tx);
     int y = int(ty);
     float pixeltx = tx - float(x);
     float pixelty = ty - float(y);
     
-    quad.topLeft = clamped(x, y);
-    quad.topRight = clamped(x + 1, y);
-    quad.bottomLeft = clamped(x, y + 1);
-    quad.bottomRight = clamped(x + 1, y + 1);
+    grid._11 = clamped(x - 1, y - 1);
+    grid._12 = clamped(x,     y - 1);
+    grid._13 = clamped(x + 1, y - 1);
+    grid._14 = clamped(x + 2, y - 1);
+
+    grid._21 = clamped(x - 1, y);
+    grid._22 = clamped(x,     y);
+    grid._23 = clamped(x + 1, y);
+    grid._24 = clamped(x + 2, y);
+
+    grid._31 = clamped(x - 1, y + 1);
+    grid._32 = clamped(x,     y + 1);
+    grid._33 = clamped(x + 1, y + 1);
+    grid._34 = clamped(x + 2, y + 1);
+
+    grid._41 = clamped(x - 1, y + 2);
+    grid._42 = clamped(x,     y + 2);
+    grid._43 = clamped(x + 1, y + 2);
+    grid._44 = clamped(x + 2, y + 2);
     
-    return bicubicInterpolation(pixeltx, pixelty, quad);
+    return bicubic_interpolation(pixeltx, pixelty, grid);
 }
 
 // Consider making these Image:: member functions
 // 1 Image input, non-Image output
-pixel4f_t ImagePipeline::max(const Image& image)
+col4f ImagePipeline::max(const Image& image)
 {
-    pixel4f_t max;
+    col4f max;
     max.r = - std::numeric_limits<float>::infinity();
     max.g = - std::numeric_limits<float>::infinity();
     max.b = - std::numeric_limits<float>::infinity();
@@ -165,9 +182,9 @@ pixel4f_t ImagePipeline::max(const Image& image)
     return max;
 }
 
-pixel4f_t ImagePipeline::min(const Image& image)
+col4f ImagePipeline::min(const Image& image)
 {
-    pixel4f_t min;
+    col4f min;
     min.r = std::numeric_limits<float>::infinity();
     min.g = std::numeric_limits<float>::infinity();
     min.b = std::numeric_limits<float>::infinity();
@@ -203,8 +220,8 @@ void ImagePipeline::scaleContrast(const Image& input, Image& output, float contr
     float higherBound = contrast;
     float lowerBound = 1.0f / contrast;
     float deltaOut = higherBound - lowerBound;
-    pixel4f_t minPixel = min(input);
-    pixel4f_t maxPixel = max(input);
+    col4f minPixel = min(input);
+    col4f maxPixel = max(input);
     float min = std::min(std::min(minPixel.r, minPixel.g), minPixel.b);
     float max = std::max(std::max(maxPixel.r, maxPixel.g), maxPixel.b);
     float delta = max - min;
@@ -227,14 +244,14 @@ void ImagePipeline::scaleBrightness(const Image& input, Image& output, float sca
     }
 }
 
-void ImagePipeline::toGreyscale(const Image& input, Image& output, pixel4f_t weights)
+void ImagePipeline::toGreyscale(const Image& input, Image& output, col4f weights)
 {
     output.resize(input.width, input.height);
     float avg;
     for (int i = 0; i < input.pixelCount; i++)
     {
         avg = brightness(input[i] * weights);
-        output[i] = { avg, avg, avg, input[i].a };
+        output[i] = col4f(avg, avg, avg, input[i].a);
     }
 }
 
@@ -246,11 +263,11 @@ void ImagePipeline::threshold(const Image& input, Image& output, float threshold
         float avg = (input[i].r + input[i].g + input[i].b) / 3.0f;
         if (avg > threshold)
         {
-            output[i] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            output[i] = col4f(1.0f, 1.0f, 1.0f, 1.0f);
         }
         else
         {
-            output[i] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            output[i] = col4f(0.0f, 0.0f, 0.0f, 0.0f);
         }
     }
 }
@@ -267,12 +284,12 @@ void ImagePipeline::thresholdColor(const Image& input, Image& output, float thre
         }
         else
         {
-            output[i] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            output[i] = col4f(0.0f, 0.0f, 0.0f, 0.0f);
         }
     }
 }
 
-void ImagePipeline::colorTint(const Image& input, Image& output, pixel4f_t tint)
+void ImagePipeline::colorTint(const Image& input, Image& output, col4f tint)
 {
     output.resize(input.width, input.height);
     for (int i = 0; i < input.pixelCount; i++)
@@ -281,16 +298,16 @@ void ImagePipeline::colorTint(const Image& input, Image& output, pixel4f_t tint)
     }
 }
 
-void ImagePipeline::adjustHSV(const Image& input, Image& output, pixel4f_hsv_t hsv)
+void ImagePipeline::adjustHSV(const Image& input, Image& output, col4f_hsv_t hsv)
 {
     output.resize(input.width, input.height);
     for (int i = 0; i < input.pixelCount; i++)
     {
-        pixel4f_hsv_t pixel = pixelRGBAtoHSVA(input[i]);
+        col4f_hsv_t pixel = colRGBAtoHSVA(input[i]);
         pixel.h = pixel.h + hsv.h;
         pixel.s = pixel.s * hsv.s;
         pixel.v = pixel.v * hsv.v;
-        output[i] = pixelHSVAtoRGBA(pixel);
+        output[i] = colHSVAtoRGBA(pixel);
     }
 }
 
@@ -412,7 +429,7 @@ void ImagePipeline::gaussianDeBlur(const Image& input, Image& output, int kernel
         // Matrix row
         for (int matRow = 0; matRow < rowMatInverse.side; matRow++)
         {
-            temp1(matRow, imgRow) = { 0.0f, 0.0f, 0.0f, input(matRow, imgRow).a };
+            temp1(matRow, imgRow) = col4f(0.0f, 0.0f, 0.0f, input(matRow, imgRow).a);
             // Matrix col
             for (int matCol = 0; matCol < rowMatInverse.side; matCol++)
             {
@@ -428,7 +445,7 @@ void ImagePipeline::gaussianDeBlur(const Image& input, Image& output, int kernel
         // Matrix row
         for (int matRow = 0; matRow < colMatInverse.side; matRow++)
         {
-            output(imgCol, matRow) = { 0.0f, 0.0f, 0.0f, temp1(imgCol, matRow).a };
+            output(imgCol, matRow) = col4f(0.0f, 0.0f, 0.0f, temp1(imgCol, matRow).a);
             // Matrix col
             for (int matCol = 0; matCol < colMatInverse.side; matCol++)
             {
@@ -617,7 +634,7 @@ void ImagePipeline::maskify(const Image& imgIn, Image& maskOut)
     maskOut.resize(imgIn.width, imgIn.height);
     for (int i = 0; i < imgIn.pixelCount; i++)
     {
-        maskOut[i] = { 0.0f, 0.0f, 0.0f, brightness(imgIn[i]) };
+        maskOut[i] = col4f(0.0f, 0.0f, 0.0f, brightness(imgIn[i]));
     }
 }
 
@@ -629,7 +646,7 @@ void ImagePipeline::horizontalMask(Image& maskOut, float t, int feathering, int 
     {
         for (int y = 0; y < height; y++)
         {
-            maskOut(x, y) = { 0.0f, 0.0f, 0.0f, mylerp((float(x) - cutoff) / feathering + 0.5f, 0.0f, 1.0f) };
+            maskOut(x, y) = col4f(0.0f, 0.0f, 0.0f, linear_interpolation((float(x) - cutoff) / feathering + 0.5f, 0.0f, 1.0f));
         }
     }
 }
@@ -642,7 +659,7 @@ void ImagePipeline::verticalMask(Image& maskOut, float t, int feathering, int wi
     {
         for (int y = 0; y < height; y++)
         {
-            maskOut(x, y) = { 0.0f, 0.0f, 0.0f, mylerp((float(y) - cutoff) / feathering + 0.5f, 0.0f, 1.0f) };
+            maskOut(x, y) = col4f(0.0f, 0.0f, 0.0f, linear_interpolation((float(y) - cutoff) / feathering + 0.5f, 0.0f, 1.0f));
         }
     }
 }
@@ -659,16 +676,29 @@ void ImagePipeline::circleMask(Image& maskOut, float t, int feathering, int widt
         for (int y = 0; y < height; y++)
         {
             maskOut(x, y) =
-            {
+            col4f(
                 0.0f,
                 0.0f,
                 0.0f,
-                mylerp(
+                linear_interpolation(
                     (sqrt((x - centerX) * (x - centerX) + (y - centerY) * (y - centerY)) - cutoff) / feathering + 0.5f,
                     0.0f,
                     1.0f
                     )
-            };
+            );
+        }
+    }
+}
+
+void ImagePipeline::perlinNoiseMask(Image& maskOut, float z, int width, int height)
+{
+    static PerlinState perlin;
+    maskOut.resize(width, height);
+    for (int x = 0; x < width; x++)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            maskOut(x, y) = col4f(0.0f, 0.0f, 0.0f, perlin.noise(10.0f * float(x) / float(width), 10.0f * float(y) / float(width), z));
         }
     }
 }

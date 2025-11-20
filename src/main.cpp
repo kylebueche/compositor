@@ -1,5 +1,6 @@
 #include "image.h"
 #include "viewport.h"
+#include "math.h"
 #include <string>
 #include <iostream>
 #include <chrono>
@@ -34,7 +35,7 @@ void dvdLogoScene()
     translation.x = 0.0f;
     translation.y = 0.0f;
 
-    pixel4f_t clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+    col4f clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
     
     int frames[9] = { 0, 24, 30, 54, 60, 84, 90, 114, 120 };
     vec2 positions[9] =
@@ -67,7 +68,7 @@ void dvdLogoScene()
         }
 
         float t = float(frame - startTime) / float(endTime - startTime);
-        translation = mylerp(t, startPos, endPos);
+        translation = linear_interpolation(t, startPos, endPos);
         viewport.clearColor(clearColor);
         viewport.drawImage(img, scale, rotation, translation);
         std::string suffix = "";
@@ -106,15 +107,15 @@ void rotatingImageScene()
     float birdsRotation = 0.0f;
     vec2 birdsTranslation = { - 1920.0f / 2.0f, 0.0f };
 
-    pixel4f_t clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+    col4f clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
     
     for (int frame = 1; frame <= 120; frame++)
     {
         float t = float(frame) / 120.0f;
 
-        sunRotation = mylerp(t, 0.0f, 360.0f * 5.0f);
+        sunRotation = linear_interpolation(t, 0.0f, 360.0f * 5.0f);
 
-        birdsTranslation.x = mylerp(t, -1920.0f / 2.0f, 1920.0f / 2.0f);
+        birdsTranslation.x = linear_interpolation(t, -1920.0f / 2.0f, 1920.0f / 2.0f);
         birdsTranslation.y = 50.0f * sin(0.2f * birdsTranslation.x);
 
         viewport.clearColor(clearColor);
@@ -147,15 +148,15 @@ void spinningHeadlineScene()
     float rotation1 = 7200.0f;
     vec2 translation1 = { 0.0f, -540.0f };
 
-    pixel4f_t clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+    col4f clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
     
     for (int frame = 1; frame <= 120; frame++)
     {
         float t = float(frame) / 120.0f;
 
-        vec2 scale = mylerp(t, scale0, scale1);
-        float rotation = mylerp(t, rotation0, rotation1);
-        vec2 translation = mylerp(t, translation0, translation1);
+        vec2 scale = linear_interpolation(t, scale0, scale1);
+        float rotation = linear_interpolation(t, rotation0, rotation1);
+        vec2 translation = linear_interpolation(t, translation0, translation1);
 
         viewport.clearColor(clearColor);
         viewport.drawImage(newspaper, scale, rotation, translation);
@@ -177,12 +178,12 @@ void tileScene()
     Image output;
     Image input;
     Image upscaled;
-    input.ensureBufferSize(540, 360);
+    input.resize(540, 360);
     int widthRatio = 1920 / input.width;
     int heightRatio = 1080 / input.height;
-    upscaled.ensureBufferSize(1920, 1080);
+    upscaled.resize(1920, 1080);
             
-    output.ensureBufferSize(1920, 1080);
+    output.resize(1920, 1080);
     int tileWidth = 1920 / 8;
     int tileHeight = 1080 / 8;
     for (int frame = 1; frame <= 120; frame++)
@@ -246,12 +247,12 @@ void pixelatedScene()
     Image output;
     Image input;
     Image upscaled;
-    input.ensureBufferSize(540, 360);
+    input.resize(540, 360);
     int widthRatio = 1920 / input.width;
     int heightRatio = 1080 / input.height;
-    upscaled.ensureBufferSize(1920, 1080);
+    upscaled.resize(1920, 1080);
             
-    output.ensureBufferSize(1920, 1080);
+    output.resize(1920, 1080);
     int tileWidth = 32;
     int tileHeight = 32;
     for (int frame = 1; frame <= 120; frame++)
@@ -294,7 +295,7 @@ void pixelatedScene()
         {
             for (int y = 0; y < 1080 / 32; y++)
             {
-                pixel4f_t tileColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+                col4f tileColor = { 0.0f, 0.0f, 0.0f, 1.0f };
                 for (int xx = 0; xx < 32; xx++)
                 {
                     for (int yy = 0; yy < 32; yy++)
@@ -322,13 +323,80 @@ void pixelatedScene()
     }
 }
 
+std::string filename(std::string stem, int frame, std::string extension)
+{
+    std::string suffix = "";
+    if (frame < 10)
+        suffix = "000";
+    else if (frame < 100)
+        suffix = "00";
+    else if (frame < 1000)
+        suffix = "0";
+    suffix += std::to_string(frame) + "." + extension;
+    return stem + suffix;
+}
+
+void perlinScene()
+{
+    ImagePipeline imgPipeline;
+    Image perlinMask(1920, 1080);
+    Image black(1920, 1080);
+    black.clearColor(col4f(0.0f, 0.0f, 0.0f, 1.0f));
+    Image white(1920, 1080);
+    white.clearColor(col4f(1.0f, 1.0f, 1.0f, 1.0f));
+    Image output(1920, 1080);
+    /*
+    for (int frame = 1; frame <= 120; frame++)
+    {
+
+        imgPipeline.perlinNoiseMask(perlinMask, 10.0f * float(frame) / 120.0f, 1920, 1080);
+        imgPipeline.composite(black, white, output, perlinMask);
+
+        std::string outputFilename = filename("output/perlin/perlin", frame, "png");
+        output.write(outputFilename.c_str());
+    }
+    */
+    /*
+    for (int frame = 121; frame <= 240; frame++)
+    {
+        imgPipeline.perlinNoiseMask(perlinMask, 10.0f * float(frame - 120) / 120.0f, 1920, 1080);
+        imgPipeline.composite(black, white, output, perlinMask);
+        imgPipeline.threshold(output, output, float(frame - 120) / 120.0f);
+        imgPipeline.gaussianBlur(output, output, 51);
+
+        std::string outputFilename = filename("output/perlin/perlin", frame, "png");
+        output.write(outputFilename.c_str());
+    }
+    */
+///*
+    Image before(1920, 1080);
+    Image after(1920, 1080);
+    before.read("input/perlin/before.jpg");
+    after.read("input/perlin/after.jpg");
+
+    for (int frame = 241; frame <= 360; frame++)
+    {
+        imgPipeline.perlinNoiseMask(perlinMask, 10.0f * float(frame - 120) / 120.0f, 1920, 1080);
+        imgPipeline.composite(black, white, output, perlinMask);
+        imgPipeline.threshold(output, output, float(frame - 240) / 120.0f);
+        imgPipeline.gaussianBlur(output, output, 51);
+        imgPipeline.maskify(output, perlinMask);
+        imgPipeline.composite(before, after, output, perlinMask);
+
+        std::string outputFilename = filename("output/perlin/perlin", frame, "png");
+        output.write(outputFilename.c_str());
+    }
+//    */
+}
+
 int main()
 {
     //dvdLogoScene();
     //rotatingImageScene();
     //spinningHeadlineScene();
     //tileScene();
-    pixelatedScene();
+    //pixelatedScene();
+    perlinScene();
 
     /*
     ImagePipeline imgPipeline;

@@ -13,7 +13,7 @@
 #include <numbers>
 #include "math.h"
 
-struct col4i_t
+struct col4i
 {
     uint8_t r;
     uint8_t g;
@@ -21,8 +21,10 @@ struct col4i_t
     uint8_t a;
 };
 
-struct col4f_t
+struct col4f
 {
+    col4f() {}
+    col4f(float r, float g, float b, float a) : r(r), g(g), b(b), a(a) {}
     float r;
     float g;
     float b;
@@ -39,40 +41,64 @@ struct col4f_hsv_t
 
 struct rgba_quad_t
 {
-    col4f_t topLeft;
-    col4f_t topRight;
-    col4f_t bottomLeft;
-    col4f_t bottomRight;
+    col4f topLeft;
+    col4f topRight;
+    col4f bottomLeft;
+    col4f bottomRight;
+};
+
+struct rgba_grid_t
+{
+    col4f _11;
+    col4f _12;
+    col4f _13;
+    col4f _14;
+
+    col4f _21;
+    col4f _22;
+    col4f _23;
+    col4f _24;
+
+    col4f _31;
+    col4f _32;
+    col4f _33;
+    col4f _34;
+
+    col4f _41;
+    col4f _42;
+    col4f _43;
+    col4f _44;
 };
 
 // Standard col operations
-inline col4f_t operator+(const col4f_t& fg, const col4f_t& bg);
-inline col4f_t operator-(const col4f_t& fg, const col4f_t& bg);
-inline col4f_t operator*(const float& scalar, const col4f_t& col);
-inline col4f_t operator*(const col4f_t& col, const float& scalar);
-inline col4f_t operator/(const col4f_t& col, const float& scalar);
-inline col4f_t operator*(const col4f_t& col1, const col4f_t& col2);
-inline col4f_t negate(const col4f_t& col1, const col4f_t& col2);
+inline col4f operator+(const col4f& fg, const col4f& bg);
+inline col4f operator-(const col4f& fg, const col4f& bg);
+inline col4f operator*(const float& scalar, const col4f& col);
+inline col4f operator*(const col4f& col, const float& scalar);
+inline col4f operator/(const col4f& col, const float& scalar);
+inline col4f operator*(const col4f& col1, const col4f& col2);
+inline col4f negate(const col4f& col1, const col4f& col2);
 
-inline int clamp(int value, int min, int max);
 inline int index(int x, int y, int width, int height);
-inline col4f_hsv_t colRGBAtoHSVA(const col4f_t& col);
-inline col4f_t colHSVAtoRGBA(const col4f_hsv_t& col);
-inline col4f_t colItoF(const col4i_t& col);
-inline col4i_t colFtoI(const col4f_t& col);
-inline col4f_t lerp(float t, col4f_t t0, col4f_t t1)
-inline col4f_t bicubic_interpolation(float tx, float ty, rgba_quad_t rgbaQuad);
-inline col4f_t bilinear_interpolation(float tx, float ty, rgba_quad_t rgbaQuad);
+inline col4f_hsv_t colRGBAtoHSVA(const col4f& col);
+inline col4f colHSVAtoRGBA(const col4f_hsv_t& col);
+inline col4f colItoF(const col4i& col);
+inline col4i colFtoI(const col4f& col);
+inline col4f linear_interpolation(float t, col4f t0, col4f t1);
+inline col4f cubic_interpolation(float t, col4f tneg1, col4f t0, col4f t1, col4f t2);
+inline col4f bilinear_interpolation(float tx, float ty, rgba_quad_t rgbaQuad);
+inline col4f bicubic_interpolation(float tx, float ty, rgba_grid_t rgbaGrid);
+inline col4f nearest_neighbor(float tx, float ty, rgba_quad_t rgbaQuad);
 
 /************************************************************************
 * RGBA Blend adapted from Wikipedia
 * TODO: Clamp is in place as a branchless safeguard against division by 0.
 * May not be the expected result when compositing two images with fully transparent backgrounds?
 ************************************************************************/
-inline col4f_t blendOver(const col4f_t& fg, const col4f_t& bg)
+inline col4f blendOver(const col4f& fg, const col4f& bg)
 {
     float aOut = clamp(fg.a + bg.b * (1.0f - fg.a), 0.001f, 1.0f);
-    col4f_t pOut = (fg * fg.a + bg * bg.a * (1.0f - fg.a)) / aOut;
+    col4f pOut = (fg * fg.a + bg * bg.a * (1.0f - fg.a)) / aOut;
     pOut.a = aOut;
     return pOut;
 }
@@ -81,7 +107,7 @@ inline col4f_t blendOver(const col4f_t& fg, const col4f_t& bg)
 * Pixel negative, not modifying alpha.
 * Explicit name chosen for clarity instead of using operator-().
 ************************************************************************/
-inline col4f_t negative(const col4f_t& col)
+inline col4f negative(const col4f& col)
 {
     return {
         1.0f - col.r,
@@ -96,7 +122,7 @@ inline col4f_t negative(const col4f_t& col)
 * A more accurate version would convert to hsv and return v,
 * but that is kinda slow.
 ************************************************************************/
-inline float brightness(const col4f_t& col)
+inline float brightness(const col4f& col)
 {
     return (col.r + col.g + col.b) / 3.0f;
 }
@@ -104,7 +130,7 @@ inline float brightness(const col4f_t& col)
 /************************************************************************
 * RGBA add, not modifying alpha. Prefer fg alpha.
 ************************************************************************/
-inline col4f_t operator+(const col4f_t& fg, const col4f_t& bg)
+inline col4f operator+(const col4f& fg, const col4f& bg)
 {
     return {
         fg.r + bg.r,
@@ -114,7 +140,7 @@ inline col4f_t operator+(const col4f_t& fg, const col4f_t& bg)
     };
 }
 
-inline col4f_t operator-(const col4f_t& fg, const col4f_t& bg)
+inline col4f operator-(const col4f& fg, const col4f& bg)
 {
     return {
         fg.r - bg.r,
@@ -127,7 +153,7 @@ inline col4f_t operator-(const col4f_t& fg, const col4f_t& bg)
 /************************************************************************
 * RGBA scale, only scales RGB channels.
 ************************************************************************/
-inline col4f_t operator*(const float& scalar, const col4f_t& col)
+inline col4f operator*(const float& scalar, const col4f& col)
 {
     return {
         scalar * col.r,
@@ -137,7 +163,7 @@ inline col4f_t operator*(const float& scalar, const col4f_t& col)
     };
 }
 
-inline col4f_t operator*(const col4f_t& col, const float& scalar)
+inline col4f operator*(const col4f& col, const float& scalar)
 {
     return {
         scalar * col.r,
@@ -147,7 +173,7 @@ inline col4f_t operator*(const col4f_t& col, const float& scalar)
     };
 }
 
-inline col4f_t operator/(const col4f_t& col, const float& scalar)
+inline col4f operator/(const col4f& col, const float& scalar)
 {
     return {
         col.r / scalar,
@@ -157,7 +183,7 @@ inline col4f_t operator/(const col4f_t& col, const float& scalar)
     };
 }
     
-inline col4f_t operator*(const col4f_t& col1, const col4f_t& col2)
+inline col4f operator*(const col4f& col1, const col4f& col2)
 {
     return {
         col1.r * col2.r,
@@ -173,7 +199,7 @@ inline col4f_t operator*(const col4f_t& col1, const col4f_t& col2)
 * Evenly maps a discrete range [0, 255] to the continuous range [0, 1]
 *
 ************************************************************************/
-inline col4f_t colItoF(const col4i_t& col)
+inline col4f colItoF(const col4i& col)
 {
     return {
         (1.0f / 255.0f) * float(col.r),
@@ -191,7 +217,7 @@ inline col4f_t colItoF(const col4i_t& col)
 * scaling by 255.99 rather than 255.0 provides a fair chance of truncating to 255.
 *
 ************************************************************************/
-inline col4i_t colFtoI(const col4f_t& col)
+inline col4i colFtoI(const col4f& col)
 {
     return {
         uint8_t(255.99f * clamp(col.r, 0.0f, 1.0f)),
@@ -208,7 +234,7 @@ inline col4i_t colFtoI(const col4f_t& col)
 * Algorithm adapted from rapidtables.com/convertor/rgb-to-hsv.html
 *
 ************************************************************************/
-inline col4f_hsv_t colRGBAtoHSVA(const col4f_t& col)
+inline col4f_hsv_t colRGBAtoHSVA(const col4f& col)
 {
     col4f_hsv_t colOut;
 
@@ -270,9 +296,9 @@ inline col4f_hsv_t colRGBAtoHSVA(const col4f_t& col)
 * Algorithm adapted from rapidtables.com/convertor/hsv-to-rgb.html
 *
 ************************************************************************/
-inline col4f_t colHSVAtoRGBA(const col4f_hsv_t& col)
+inline col4f colHSVAtoRGBA(const col4f_hsv_t& col)
 {
-    col4f_t colOut;
+    col4f colOut;
     // Ensure 0 <= H < 360,
     //        0 <= S <= 1,
     //        0 <= V <= 1
@@ -343,29 +369,50 @@ inline col4f_t colHSVAtoRGBA(const col4f_hsv_t& col)
     return colOut;
 }
 
-inline col4f_t lerp(float t, col4f_t t0, col4f_t t1)
+inline col4f linear_interpolation(float t, col4f t0, col4f t1)
 {
-    return { lerp(t, t0.r, t1.r),
-             lerp(t, t0.g, t1.g),
-             lerp(t, t0.b, t1.b),
-             lerp(t, t0.a, t1.a) };
+    return { linear_interpolation(t, t0.r, t1.r),
+             linear_interpolation(t, t0.g, t1.g),
+             linear_interpolation(t, t0.b, t1.b),
+             linear_interpolation(t, t0.a, t1.a) };
 }
 
-// tx: 0 is left, ty: 0 is up
-inline col4f_t bilinear_interpolation(float tx, float ty, rgba_quad_t rgbaQuad)
+inline col4f cubic_interpolation(float t, col4f tneg1, col4f t0, col4f t1, col4f t2)
 {
-    col4f_t topColor = mylerp(tx, rgbaQuad.topLeft, rgbaQuad.topRight);
-    col4f_t bottomColor = mylerp(tx, rgbaQuad.bottomLeft, rgbaQuad.bottomRight);
-    col4f_t color = mylerp(ty, topColor, bottomColor);
+    return { cubic_interpolation(t, tneg1.r, t0.r, t1.r, t2.r),
+             cubic_interpolation(t, tneg1.g, t0.g, t1.g, t2.g),
+             cubic_interpolation(t, tneg1.b, t0.b, t1.b, t2.b),
+             cubic_interpolation(t, tneg1.a, t0.a, t1.a, t2.a) };
+}
+
+
+// tx: 0 is left, ty: 0 is up
+inline col4f bilinear_interpolation(float tx, float ty, rgba_quad_t rgbaQuad)
+{
+    col4f topColor = linear_interpolation(tx, rgbaQuad.topLeft, rgbaQuad.topRight);
+    col4f bottomColor = linear_interpolation(tx, rgbaQuad.bottomLeft, rgbaQuad.bottomRight);
+    col4f color = linear_interpolation(ty, topColor, bottomColor);
     return color;
 }
 
 // tx: 0 is left, ty: 0 is up
-inline col4f_t bicubic_interpolation(float tx, float ty, rgba_quad_t rgbaQuad)
+inline col4f bicubic_interpolation(float tx, float ty, rgba_grid_t rgbaGrid)
 {
-    col4f_t topColor = cubic_interpolation(tx, rgbaQuad.topLeft, rgbaQuad.topRight);
-    col4f_t bottomColor = cubic_interpolation(tx, rgbaQuad.bottomLeft, rgbaQuad.bottomRight);
-    col4f_t color = cubic_interpolation(ty, topColor, bottomColor);
+    col4f color_1 = cubic_interpolation(tx, rgbaGrid._11, rgbaGrid._12, rgbaGrid._13, rgbaGrid._14);
+    col4f color_2 = cubic_interpolation(tx, rgbaGrid._21, rgbaGrid._22, rgbaGrid._23, rgbaGrid._24);
+    col4f color_3 = cubic_interpolation(tx, rgbaGrid._31, rgbaGrid._32, rgbaGrid._33, rgbaGrid._34);
+    col4f color_4 = cubic_interpolation(tx, rgbaGrid._41, rgbaGrid._42, rgbaGrid._43, rgbaGrid._44);
+    col4f color = cubic_interpolation(ty, color_1, color_2, color_3, color_4);
+    return color;
+}
+
+// tx: 0 is left, ty: 0 is up
+// branchless nearest neighbor
+inline col4f nearest_neighbor(float tx, float ty, rgba_quad_t rgbaQuad)
+{
+    col4f topColor = (tx < 0.5f) * rgbaQuad.topLeft + (tx >= 0.5f) * rgbaQuad.topRight;
+    col4f bottomColor = (tx < 0.5f) * rgbaQuad.bottomLeft + (tx >= 0.5f) * rgbaQuad.bottomRight;
+    col4f color = (ty < 0.5f) * topColor + (ty >= 0.5f) * bottomColor;
     return color;
 }
 

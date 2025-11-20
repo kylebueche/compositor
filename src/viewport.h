@@ -6,33 +6,42 @@
 #include <iostream>
 #include "image.h"
 
+
+
 class Viewport
 {
 public:
-    std::vector<vec2> pixelCoords;
+    //std::vector<vec2> pixelCoords;
     int width;
     int height;
     Image viewport;
     
     std::vector<vec2> temp;
 
+    /*
+    * Viewport coords are implicitely [-1, +1] for height and [-1, +1] for width
+    * Images are implicitely at a scaled height of 2, centered at (0, 0), and at a scaled width
+    * Scaled width of image = 2.0f * float(image.width) / float(viewport.width)
+    *
+    * Initial position of the image is viewport (0, 0) plus the vector (-scaledWidth / 2.0f, -scaledHeight / 2.0f)
+    */
     Viewport(int width, int height) : width(width), height(height)
-    {:
+    {
         viewport.resize(width, height);
-        pixelCoords.resize(width * height);
+        //pixelCoords.resize(width * height);
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
             {
-                int index = y * width + x;
+                //int index = y * width + x;
                 viewport(x, y) = { 0.0f, 0.0f, 0.0f, 1.0f };
-                pixelCoords[index].x = float(x);
-                pixelCoords[index].y = float(y);
+                //pixelCoords[index].x = float(x);
+                //pixelCoords[index].y = float(y);
             }
         }
     }
     
-    void clearColor(pixel4f_t color)
+    void clearColor(col4f color)
     {
         for (int i = 0; i < viewport.pixelCount; i++)
         {
@@ -42,6 +51,36 @@ public:
 
     void drawImage(const Image& image, vec2 scale, float rotation, vec2 translation)
     {
+        // Initial position of image, with height set to 2.0f, and centered on (0.0f, 0.0f)
+        float scaledHeight = 2.0f;
+        float scaledWidth = 2.0f * float(image.width) / float(viewport.width);
+        vec2 topLeftPos = { -scaledWidth / 2.0f, -scaledHeight / 2.0f };
+        vec2 leftToRight = { scaledWidth, 0.0f };
+        vec2 topToBottom = { 0.0f, scaledHeight };
+        //vec2 u_direction = normalized(leftToRight);
+        //vec2 v_direction = normalized(topToBottom);
+
+        // Translating, Rotating, and Scaling an image applies those operations
+        // to the top Left Position, the left to right vector, and the
+        // top to bottom vector each in turn
+
+        // scale
+        vec2 scaledPos = vecScale(scale, topLeftPos);
+        vec2 scaledLtoR = vecScale(scale, leftToRight);
+        vec2 scaledTtoB = vecScale(scale, topToBottom);
+
+        // rotate
+        float radians = rotation * std::numbers::pi / 180.0f;
+        vec2 rotatedPos = vecRotate(radians, scaledPos);
+        vec2 rotatedLtoR = vecRotate(radians, scaledLtoR);
+        vec2 rotatedTtoB = vecRotate(radians, scaledTtoB);
+
+        // translate
+        vec2 translatedPos = vecTranslate(translation, rotatedPos);
+        vec2 translatedLtoR = vecTranslate(translation, rotatedLtoR);
+        vec2 translatedTtoB = vecTranslate(translation, rotatedTtoB);
+
+        /*
         float halfWidth = float(image.width) / 2.0f;
         float halfHeight = float(image.height) / 2.0f;
         temp.resize(image.width * image.height);
@@ -76,7 +115,22 @@ public:
                 temp[y * image.width + x] = translated;
             }
         }
+        */
 
+        /* 
+         * Length from one pixel to the next in u direction:
+         * len_u = len_u / 1.0f = len_u * width / width = transformedWidth / width;
+         * 
+         * Lenfth from one pixel to the next in v direction:
+         * len_v = len_v / 1.0f = len_u * height / height = transformedHeight / height;
+         */
+
+        float len_u = length(translatedLtoR) / image.width;
+        float len_v = length(translatedTtoB) / image.height;
+        vec2 norm_u = normalized(translatedLtoR);
+        vec2 norm_v = normalized(translatedTtoB);
+
+        /*
         // Top left of the top left pixel
         vec2 image_00 = temp[0];
         // Vector going in the x direction, length one pixel
@@ -95,14 +149,15 @@ public:
         vec2 norm_u = normalized(u);
         vec2 norm_v = normalized(v);
 
+        */
         for (int x = 0; x < viewport.width; x++)
         {
             for (int y = 0; y < viewport.height; y++)
             {
                 vec2 viewportPoint;
-                viewportPoint.x = float(x) - halfWidth;
-                viewportPoint.y = float(y) - halfHeight;
-                vec2 h = viewportPoint - image_00;
+                viewportPoint.x = linear_interpolation(float(x) / float(viewport.width), -1.0f, 1.0f);
+                viewportPoint.y = linear_interpolation(float(y) / float(viewport.height), -1.0f, 1.0f);
+                vec2 h = viewportPoint - translatedPos;
                 float sideLenX = dot(h, norm_u);
                 float sideLenY = dot(h, norm_v);
 
@@ -121,7 +176,7 @@ public:
                     rgbaQuad.topRight = image(topLeftX + 1, topLeftY);
                     rgbaQuad.bottomLeft = image(topLeftX, topLeftY + 1);
                     rgbaQuad.bottomRight = image(topLeftX + 1, topLeftY + 1);
-                    viewport(x, y) = bilinear_interpolation(tx, ty, rgbaQuad); // Later put bilinear interpolation here. (Or bicubic).
+                    viewport(x, y) = bilinear_interpolation(tx, ty, rgbaQuad);
                 }
 
             //    int viewportX = int(translated.x + halfWidth);
