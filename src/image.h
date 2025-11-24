@@ -139,7 +139,7 @@ public:
     void horizontalMask(Image& maskOut, float t, int feathering, int width, int height);
     void verticalMask(Image& maskOut, float t, int feathering, int width, int height);
     void circleMask(Image& maskOut, float t, int feathering, int width, int height);
-    void perlinNoiseMask(Image& maskOut, float z, int width, int height);
+    void perlinNoiseMask(Image& maskOut, float frequency, float z, int width, int height);
     
     // 2 Image input, 1 Mask input, 1 Image output
     // Not size checked for now

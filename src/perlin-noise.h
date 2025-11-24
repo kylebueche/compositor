@@ -114,6 +114,8 @@ public:
         return (linear_interpolation(w, y1, y2) + 1.0f) / 2.0f;
     }
 
+    float noise(vec3 a) { return noise(a.x, a.y, a.z); }
+
     float octaveNoise(float x, float y, float z, int octaves, float persistence)
     {
         float total = 0.0f;

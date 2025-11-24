@@ -19,6 +19,13 @@ struct vec2
     float y;
 };
 
+struct vec3
+{
+    float x;
+    float y;
+    float z;
+};
+
 inline vec2 operator+(const vec2& a, const vec2& b) { return { a.x + b.x, a.y + b.y }; }
 inline vec2 operator-(const vec2& a, const vec2& b) { return { a.x - b.x, a.y - b.y }; }
 inline vec2 operator*(const float& a, const vec2& b) { return { a * b.x, a * b.y }; }
@@ -52,6 +59,15 @@ inline vec2 vecTranslate(const vec2& translation, const vec2& a)
     return { translation.x + a.x, translation.y + a.y };
 }
 
+inline vec3 operator+(const vec3& a, const vec3& b) { return { a.x + b.x, a.y + b.y, a.z + b.z }; }
+inline vec3 operator-(const vec3& a, const vec3& b) { return { a.x - b.x, a.y - b.y, a.z - b.z }; }
+inline vec3 operator*(const float& a, const vec3& b) { return { a * b.x, a * b.y, a * b.z }; }
+inline vec3 operator*(const vec3& a, const float& b) { return { a.x * b, a.y * b, a.z * b }; }
+inline float dot(const vec3& a, const vec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; };
+inline float length2(const vec3& a) { return dot(a, a); };
+inline float length(const vec3& a) { return sqrt(length2(a)); };
+inline float distance(const vec3& a, const vec3& b) { return length(a - b); };
+inline vec3 normalized(const vec3& a) { return (1.0f / length(a)) * a; };
 
 /************************************************************************
 * Branchless clamp for ints and floats

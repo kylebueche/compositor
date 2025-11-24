@@ -690,7 +690,7 @@ void ImagePipeline::circleMask(Image& maskOut, float t, int feathering, int widt
     }
 }
 
-void ImagePipeline::perlinNoiseMask(Image& maskOut, float z, int width, int height)
+void ImagePipeline::perlinNoiseMask(Image& maskOut, float frequency, float z, int width, int height)
 {
     static PerlinState perlin;
     maskOut.resize(width, height);
@@ -698,7 +698,9 @@ void ImagePipeline::perlinNoiseMask(Image& maskOut, float z, int width, int heig
     {
         for (int y = 0; y < height; y++)
         {
-            maskOut(x, y) = col4f(0.0f, 0.0f, 0.0f, perlin.noise(10.0f * float(x) / float(width), 10.0f * float(y) / float(width), z));
+            // Normalize noise from [0, 1] to [0, width)
+            vec3 point = vec3(x, y, z) * (frequency / float(width));
+            maskOut(x, y) = col4f(0.0f, 0.0f, 0.0f, perlin.noise(point));
         }
     }
 }

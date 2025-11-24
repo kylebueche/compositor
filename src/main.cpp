@@ -374,14 +374,25 @@ void perlinScene()
     before.read("input/perlin/before.jpg");
     after.read("input/perlin/after.jpg");
 
+    col4f red = col4f(1.0f, 0.1f, 0.0f, 1.0f);
+    Image redImg(1920, 1080);
+    redImg.clearColor(red);
     for (int frame = 241; frame <= 360; frame++)
     {
-        imgPipeline.perlinNoiseMask(perlinMask, 10.0f * float(frame - 120) / 120.0f, 1920, 1080);
-        imgPipeline.composite(black, white, output, perlinMask);
-        imgPipeline.threshold(output, output, float(frame - 240) / 120.0f);
+        float t = float(frame - 240) / 120.0f;
+        imgPipeline.perlinNoiseMask(perlinMask, 100.0f, float(frame), 1920, 1080);
+        imgPipeline.composite(white, black, output, perlinMask);
+        imgPipeline.threshold(output, output, t);
         imgPipeline.gaussianBlur(output, output, 51);
         imgPipeline.maskify(output, perlinMask);
         imgPipeline.composite(before, after, output, perlinMask);
+
+        imgPipeline.perlinNoiseMask(perlinMask, 50.0f, float(frame), 1920, 1080);
+        imgPipeline.composite(white, black, before, perlinMask);
+        imgPipeline.threshold(before, before, t);
+        imgPipeline.gaussianBlur(before, before, 51);
+        imgPipeline.maskify(before, perlinMask);
+        imgPipeline.composite(output, redImg, output, perlinMask);
 
         std::string outputFilename = filename("output/perlin/perlin", frame, "png");
         output.write(outputFilename.c_str());
