@@ -18,6 +18,19 @@
 #include "perlin-noise.h"
 #include <cmath>
 
+std::string fileName(std::string stem, int frame, std::string extension)
+{
+    std::string suffix = "";
+    if (frame < 10)
+        suffix = "000";
+    else if (frame < 100)
+        suffix = "00";
+    else if (frame < 1000)
+        suffix = "0";
+    suffix += std::to_string(frame) + "." + extension;
+    return stem + suffix;
+}
+
 Image::Image()
 {
     this->width = 0;

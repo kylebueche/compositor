@@ -20,6 +20,7 @@
 
 const int NUM_CHANNELS = 4;
 
+std::string fileName(std::string stem, int frame, std::string extension);
 
 // Handles file I/O, dynamic sizing, single-image storing.
 class Image

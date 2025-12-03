@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <chrono>
+#include "temporal-sampler.h"
 
 void dvdLogoScene()
 {
@@ -323,19 +324,6 @@ void pixelatedScene()
     }
 }
 
-std::string filename(std::string stem, int frame, std::string extension)
-{
-    std::string suffix = "";
-    if (frame < 10)
-        suffix = "000";
-    else if (frame < 100)
-        suffix = "00";
-    else if (frame < 1000)
-        suffix = "0";
-    suffix += std::to_string(frame) + "." + extension;
-    return stem + suffix;
-}
-
 void perlinScene()
 {
     ImagePipeline imgPipeline;
@@ -394,11 +382,30 @@ void perlinScene()
         imgPipeline.maskify(before, perlinMask);
         imgPipeline.composite(output, redImg, output, perlinMask);
 
-        std::string outputFilename = filename("output/perlin/perlin", frame, "png");
+        std::string outputFilename = fileName("output/perlin/perlin", frame, "png");
         output.write(outputFilename.c_str());
     }
 //    */
 }
+
+
+void temporalSamplerScene()
+{
+    TemporalSampler tsamp;
+    int frames = 243;
+    tsamp.loadFrames("input/temporal/temporal", frames, "png");
+    ImagePipeline imgPipeline;
+    Image mask;
+    
+    for (int i = 0; i < tsamp.size(); i++)
+    {
+        imgPipeline.perlinNoiseMask(mask, 50.0f, float(i), tsamp.inputFrames[0].width, tsamp.inputFrames[0].height);
+        tsamp.processFrame(i, -50, 0, mask);
+    }
+    tsamp.writeFrames("output/temporal/temporal", frames, "png");
+}
+
+
 
 int main()
 {
@@ -407,7 +414,8 @@ int main()
     //spinningHeadlineScene();
     //tileScene();
     //pixelatedScene();
-    perlinScene();
+    //perlinScene();
+    temporalSamplerScene();
 
     /*
     ImagePipeline imgPipeline;
